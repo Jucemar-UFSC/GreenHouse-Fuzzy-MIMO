@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test10 - Fix Evap Direction</title></head>
+<body>
+<script>
+const DT=30;
+
+function simFinal(TI,TE,VV,SP,b,ex,jl,jsup,alm,aqN,p){
+  const dT_cond=(TE-TI)*DT/p.tc;
+  let Qs=TE>=28?p.sh:TE>=20?p.sw:TE>=12?p.sc:0;
+  Qs*=(1-(alm/100)*0.88);
+  
+  // Ventilação: só quando TI > TE (traz ar mais frio)
+  let dT_vent=0;
+  if(TI>TE){
+    const vf=(jl/100)*0.6+(jsup?1:0)*0.3+(ex/100)*0.5;
+    const tv=p.tvb/(1+vf*3.5+Math.min(2,VV/4));
+    dT_vent=(TE-TI)*DT/tv;
+  }
+  
+  const Tpad=TE-0.88*(TE-(TE-(1-0.55)*12));
+  const bf=b/100, ef=ex/100;
+  let dT_evap=0, dT_super=0;
+  
+  if(bf>0.02&&ef>0.02){
+    // Evaporação: o pad resfria o ar abaixo de TE
+    // Só resfria quando TI > Tpad (air temperature delta)
+    // Quando TI < Tpad: o ar do pad está mais quente → não usar
+    if(TI>Tpad){
+      dT_evap=(Tpad-TI)*DT/(p.teb/(bf*ef));  // negativo (resfria)
+    }
+    // dT_evap = 0 quando TI <= Tpad (não aquece nem resfria nessa faixa)
+    
+    // Superresfriamento: sempre que TI > SP e SP < Tpad
+    // Representa a energia extra dos atuadores para ir abaixo de Tpad
+    if(TI>SP){
+      const gap=Math.max(0,Tpad-SP);   // quanto SP está abaixo de Tpad
+      const dist=TI-SP;                 // distância atual ao SP
+      const force=Math.min(1,gap/p.gn)*bf*ef;
+      if(force>0.01){
+        dT_super=-dist*DT/(p.tsb/force);
+      }
+      // Também: quando TI está entre SP e Tpad, mas SP<Tpad
+      // o sistema continua puxando para SP
+    }
+  }
+  
+  let dT_aq=0;
+  if(aqN>0){
+    const Tt=Math.min(TE+p.dta*(aqN/4),60);
+    dT_aq=(Tt-TI)*DT/(p.tab/(aqN/4));
+  }
+  
+  const dT=Math.max(-8,Math.min(8,dT_cond+Qs+dT_vent+dT_evap+dT_super+dT_aq));
+  return{nTI:Math.max(-5,Math.min(65,TI+dT)),dT,Tpad,
+    c:{dT_cond,Qs,dT_vent,dT_evap,dT_super,dT_aq}};
+}
+
+function run(name,TI0,TE,VV,SP,b,ex,jl,jsup,alm,aqN,p,mx=50){
+  let TI=TI0,ok=false;
+  for(let t=1;t<=mx;t++){
+    const r=simFinal(TI,TE,VV,SP,b,ex,jl,jsup,alm,aqN,p);
+    if(t<=4||(Math.abs(SP-TI)<4&&t<=20))
+      console.log("  T"+t+" TI="+TI.toFixed(2)+" dT="+r.dT.toFixed(3));
+    TI=r.nTI;
+    if(Math.abs(SP-TI)<0.5){console.log(name+" ✅ T"+t+" TI="+TI.toFixed(2));ok=true;break;}
+  }
+  if(!ok)console.log(name+" ❌ TI="+TI.toFixed(2)+" E="+(SP-TI).toFixed(2));
+}
+
+const p={tc:8000,sh:0.08,sw:0.05,sc:0.015,tvb:1600,teb:280,tsb:55,gn:10,dta:35,tab:900};
+
+console.log("=== sh="+p.sh+" tsb="+p.tsb+" teb="+p.teb+" ===");
+run("V38→25",38,35,2,25,100,100,100,true,0,0,p,40);
+run("I 8→18", 8, 3,5,18,  0,  0,  0,false,0,4,p,40);
+run("Q34→25",34,28,3,25,100,100,100,true,0,0,p,30);
+run("N30→26",30,25,3,26, 70, 70, 70,true,0,0,p,20);
+
+// Teste manutenção
+console.log("--- MAN: TI=25,SP=25,TE=35 com 20% power ---");
+let TIm=25;
+for(let t=1;t<=6;t++){
+  const r=simFinal(TIm,35,2,25,20,20,30,false,85,0,p);
+  console.log("T"+t+" TI="+TIm.toFixed(3)+" dT="+r.dT.toFixed(3));
+  TIm=r.nTI;
+}
+</script>
+</body></html>

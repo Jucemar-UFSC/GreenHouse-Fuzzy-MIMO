@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Teste Física</title>
+<style>body{background:#111;color:#eee;font-family:monospace;padding:20px} pre{font-size:13px}</style>
+</head>
+<body>
+<h2>Teste de Convergência TI → SP</h2>
+<div id="out"></div>
+<script>
+window.onload = function() {
+const W=8, L=14, H=6;
+const RHO=1.2, CP=1005, DT=30;
+const P_BOMBA=370, P_EX=250, P_AQ=1500;
+
+function sim(TI, TE, VV, SP, b_pct, ex_pct, jl_pct, jsup, alm, aq_n) {
+  const vol   = W*L*H;
+  const massa = vol*RHO;
+  const ac    = W*L;
+  const ae    = 2*(W+L)*H + ac;
+
+  let rad = TE>=28?800:TE>=20?450:TE>=12?150:0;
+  const Ps = rad * ac * (1-(alm/100)*0.88) * 0.07;
+  const Pc = 5.5 * ae * (TE-TI);
+  const Pa = aq_n * P_AQ;
+
+  const jlf=jl_pct/100, jsf=jsup?1:0, ef=ex_pct/100;
+  const va  = 1+Math.min(3,VV/3.5);
+  const ach = jlf*10*va + jsf*5*va + ef*20;
+  const fl  = ach*vol/3600*RHO;
+  const Pv  = fl*CP*(TI-TE);
+
+  const HR=0.55, D=12, eff=0.88;
+  const Tbwb = TE-(1-HR)*D;
+  const Tpad = TE-eff*(TE-Tbwb);
+  const bf   = b_pct/100;
+  const fp   = ef*vol/3600*RHO*15;
+  const Pe   = bf*fp*CP*Math.max(0,TI-Tpad);
+
+  const COP=2.5;
+  const Pel = bf*P_BOMBA + ef*2*P_EX;
+  let Psuper=0;
+  if (SP<Tpad && bf>0.05 && ef>0.05) {
+    const gap=Math.min(10,Tpad-SP);
+    Psuper = Math.min(1,gap/8)*Pel*COP;
+  }
+
+  const Pt  = Ps+Pc+Pa-Pv-Pe-Psuper;
+  const dT  = Math.max(-8,Math.min(8,(Pt*DT)/(massa*CP)));
+  return {nTI:Math.max(-5,Math.min(65,TI+dT)), dT, Pv, Pe, Psuper, Tpad, ach, Pt};
+}
+
+let html = '<b style="color:#0f0">CENÁRIO VERÃO: TI=38, TE=35, VV=2, SP=25</b><br>';
+let TI=38, TE=35, VV=2, SP=25;
+const Tbwb0 = 35-(1-0.55)*12;
+const Tpad0 = 35-0.88*(35-Tbwb0);
+html += `TBU=${Tbwb0.toFixed(2)}°C  Tpad=${Tpad0.toFixed(2)}°C  SP=25°C<br>`;
+html += '<pre>Tick  TI       dT/tick  Erro     Pvent     Pevap    Psuper   ACH\n';
+let converged = false;
+for (let t=1; t<=25 && !converged; t++) {
+  const r = sim(TI,TE,VV,SP,100,100,100,true,0,0);
+  const E = SP-TI;
+  html += `T${String(t).padStart(2)}  ${TI.toFixed(3)}°C  ${r.dT>=0?'+':''}${r.dT.toFixed(3)}   ${(E>=0?'+':'')}${E.toFixed(3)}   ${Math.round(r.Pv).toString().padStart(7)}W  ${Math.round(r.Pe).toString().padStart(6)}W  ${Math.round(r.Psuper).toString().padStart(6)}W  ${r.ach.toFixed(1)}\n`;
+  TI = r.nTI;
+  if (Math.abs(SP-TI)<0.5) { html += `  ✅ SETPOINT ATINGIDO (tick ${t})!\n`; converged=true; }
+}
+html += `TI final = ${TI.toFixed(3)}°C  Erro = ${(SP-TI).toFixed(3)}°C\n</pre>`;
+
+html += '<b style="color:#0af">CENÁRIO INVERNO: TI=8, TE=3, VV=5, SP=18</b><br>';
+let TI2=8, TE2=3, VV2=5, SP2=18;
+html += '<pre>Tick  TI       dT/tick  Erro\n';
+for (let t=1; t<=30; t++) {
+  const r = sim(TI2,TE2,VV2,SP2,0,0,0,false,0,4);
+  const E = SP2-TI2;
+  html += `T${String(t).padStart(2)}  ${TI2.toFixed(3)}°C  ${r.dT>=0?'+':''}${r.dT.toFixed(3)}   ${(E>=0?'+':'')}${E.toFixed(3)}\n`;
+  TI2 = r.nTI;
+  if (Math.abs(SP2-TI2)<0.5) { html += `  ✅ SETPOINT ATINGIDO (tick ${t})!\n`; break; }
+}
+html += `TI final = ${TI2.toFixed(3)}°C  Erro = ${(SP2-TI2).toFixed(3)}°C\n</pre>`;
+
+document.getElementById('out').innerHTML = html;
+};
+</script>
+</body></html>

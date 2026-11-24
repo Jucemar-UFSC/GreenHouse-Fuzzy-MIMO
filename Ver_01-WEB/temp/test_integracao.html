@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Teste Integração Completa</title></head>
+<body>
+<script src="../js/fuzzy-engine.js"></script>
+<script src="../js/simulation.js"></script>
+<script>
+// Mock de funções da UI que simulation.js chama
+function atualizarUI(){}
+function atualizarGraficos(){}
+function atualizarResultados(){}
+function adicionarLog(){}
+function adicionarLogManual(){}
+function clearLog(){}
+function updateAllDisplays(){}
+function updateGreenhouseSVG(){}
+function drawMembershipFunctions(){}
+function resetGraficos(){}
+function atualizarGraficoANFIS(){}
+function formatSimTime(s){return s+'s';}
+function showToast(){}
+function updateSimStatusDot(){}
+
+// Simular cenário de verão
+SIM_STATE.TI=38; SIM_STATE.TE=35; SIM_STATE.VV=2; SIM_STATE.SP=25;
+SIM_STATE.sim_onoff_TI=38;
+fuzzyEngine.reset();
+
+console.log("=== INTEGRAÇÃO COMPLETA - VERÃO TI=38 TE=35 SP=25 ===");
+const MAX=30;
+let converged=false;
+
+for(let t=1;t<=MAX;t++){
+  SIM_STATE.running=true;
+  SIM_STATE.paused=false;
+  executarTick();
+  
+  const TI=SIM_STATE.TI;
+  const ref=SIM_STATE.ref_crisp_last;
+  const hea=SIM_STATE.hea_crisp_last;
+  const b=SIM_STATE.bomba_pct;
+  const ex=SIM_STATE.exaustor_pct;
+  const E=SIM_STATE.SP-TI;
+  
+  console.log("T"+t+" TI="+TI.toFixed(2)+" E="+E.toFixed(2)+" REF="+ref.toFixed(1)+" Bomba="+b.toFixed(0)+"% Exaust="+ex.toFixed(0)+"%");
+  
+  if(Math.abs(E)<0.5){
+    console.log("✅ SETPOINT ATINGIDO T"+t+" TI="+TI.toFixed(2));
+    converged=true; break;
+  }
+}
+if(!converged) console.log("❌ NÃO CONVERGIU FINAL TI="+SIM_STATE.TI.toFixed(2));
+
+// Cenário inverno
+SIM_STATE.TI=8; SIM_STATE.TE=3; SIM_STATE.VV=5; SIM_STATE.SP=18;
+SIM_STATE.sim_onoff_TI=8; SIM_STATE.tick=0;
+SIM_STATE.bomba_pct=0; SIM_STATE.exaustor_pct=0; SIM_STATE.aquecedor_pct=0;
+SIM_STATE.jan_lat_pct=0; SIM_STATE.jan_lat_atual=0;
+SIM_STATE.tp_bomba={tempoON:0,tempoOFF:60,percentual:0,ativo:false};
+SIM_STATE.tp_exaustor={tempoON:0,tempoOFF:60,percentual:0,ativo:false};
+SIM_STATE.aquecedor_estagio={numAtivos:0,estagio:0,nome:'DESLIGADO'};
+fuzzyEngine.reset();
+
+console.log("=== INTEGRAÇÃO - INVERNO TI=8 TE=3 SP=18 ===");
+converged=false;
+for(let t=1;t<=35;t++){
+  executarTick();
+  const TI=SIM_STATE.TI;
+  const E=SIM_STATE.SP-TI;
+  const aq=SIM_STATE.aquecedor_estagio.nome;
+  if(t<=5||Math.abs(E)<3)
+    console.log("T"+t+" TI="+TI.toFixed(2)+" E="+E.toFixed(2)+" Aq="+aq);
+  if(Math.abs(E)<0.5){console.log("✅ SP T"+t+" TI="+TI.toFixed(2));converged=true;break;}
+}
+if(!converged) console.log("❌ NÃO CONVERGIU FINAL TI="+SIM_STATE.TI.toFixed(2));
+</script>
+</body></html>

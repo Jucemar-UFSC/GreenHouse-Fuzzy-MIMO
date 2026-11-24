@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test5</title></head>
+<body>
+<script>
+// Buscar parâmetros que garantam convergência para SP em ~15-25 ticks
+const DT=30;
+
+function simV2(TI, TE, VV, SP, b_pct, ex_pct, jl_pct, jsup, alm_pct, aq_n, cfg) {
+  const {tau_cond, tau_vent_base, tau_evap_base, tau_super_base, T_aq_max_delta, tau_aq_base} = cfg;
+  
+  // 1. Condução
+  const dT_cond = (TE - TI) * DT / tau_cond;
+  
+  // 2. Solar
+  let Qsolar = TE>=28?0.20:TE>=20?0.10:TE>=12?0.04:0;
+  Qsolar *= (1-(alm_pct/100)*0.88);
+  const dT_solar = Qsolar * DT/30;
+  
+  // 3. Ventilação natural+forçada → arrasta para TE
+  const vent_f = (jl_pct/100)*0.5+(jsup?1:0)*0.25+(ex_pct/100)*0.4;
+  const tau_v  = tau_vent_base/(1+vent_f*4);
+  const dT_vent = (TE - TI) * DT / tau_v;
+  
+  // 4. Evaporação → arrasta para T_pad
+  const HR=0.55, eff=0.88;
+  const Tbwb = TE-(1-HR)*12;
+  const Tpad = TE-eff*(TE-Tbwb);
+  const bf=b_pct/100, ef=ex_pct/100;
+  let dT_evap=0, dT_super=0;
+  if(bf>0.02&&ef>0.02){
+    const tau_e = tau_evap_base/(bf*ef);
+    dT_evap = (Tpad-TI)*DT/tau_e;
+    // Super: arrasta para SP quando SP<Tpad
+    if(SP<Tpad && TI>SP){
+      const gap = Math.min(10, Tpad-SP);
+      const force = Math.min(1,gap/6)*bf*ef;
+      const tau_s = tau_super_base/force;
+      dT_super = (SP-TI)*DT/tau_s;
+    }
+  }
+  
+  // 5. Aquecimento
+  let dT_aq=0;
+  if(aq_n>0){
+    const T_tgt = Math.min(TE + T_aq_max_delta*(aq_n/4), 60);
+    const tau_a = tau_aq_base/(aq_n/4);
+    dT_aq = (T_tgt-TI)*DT/tau_a;
+  }
+  
+  const dT = Math.max(-8,Math.min(8, dT_cond+dT_solar+dT_vent+dT_evap+dT_super+dT_aq));
+  return {nTI:Math.max(-5,Math.min(65,TI+dT)),dT,Tpad,dT_evap,dT_super,dT_vent};
+}
+
+// CONFIGURAÇÃO ALVO:
+// Verão: ~15 ticks para ir de 38 para 25°C (7.5min sim) = -0.87°C/tick
+// Inverno: ~25 ticks para ir de 8 para 18°C = +0.4°C/tick
+const cfg = {
+  tau_cond:       6000,  // 100min condução natural (moderada)
+  tau_vent_base:  1800,  // base ventilação (sem forçar)
+  tau_evap_base:   400,  // base evaporação (eficaz!)
+  tau_super_base:  300,  // base superresfriamento (forte!)
+  T_aq_max_delta:  25,   // aquecedores sobem até TE+25°C
+  tau_aq_base:    1500,  // velocidade aquecimento
+};
+
+console.log("--- CFG: tau_cond="+cfg.tau_cond+" tau_evap="+cfg.tau_evap_base+" tau_super="+cfg.tau_super_base+" ---");
+
+// VERÃO
+let TI=38;
+console.log("VERAO: Tpad="+(35-0.88*(35-(35-(1-0.55)*12))).toFixed(2));
+for(let t=1;t<=30;t++){
+  const r=simV2(TI,35,2,25,100,100,100,true,0,0,cfg);
+  if(t<=10||Math.abs(25-TI)<3)console.log("T"+t+" TI="+TI.toFixed(3)+" dT="+r.dT.toFixed(3)+" Ev="+r.dT_evap.toFixed(3)+" Su="+r.dT_super.toFixed(3));
+  TI=r.nTI;
+  if(Math.abs(25-TI)<0.5){console.log("✅ SP T"+t+" TI="+TI.toFixed(3));break;}
+}
+console.log("FINAL VERAO "+TI.toFixed(3));
+
+// INVERNO
+let TI2=8;
+for(let t=1;t<=40;t++){
+  const r=simV2(TI2,3,5,18,0,0,0,false,0,4,cfg);
+  if(t<=10||Math.abs(18-TI2)<3)console.log("T"+t+" TI="+TI2.toFixed(3)+" dT="+r.dT.toFixed(3));
+  TI2=r.nTI;
+  if(Math.abs(18-TI2)<0.5){console.log("✅ SP T"+t+" TI="+TI2.toFixed(3));break;}
+}
+console.log("FINAL INVERNO "+TI2.toFixed(3));
+
+// MANUTENÇÃO (TI≈SP): não deve haver deriva
+console.log("--- MANUTENÇÃO TI=25 TE=35 SP=25 (todos ligados) ---");
+let TI3=25;
+for(let t=1;t<=5;t++){
+  const r=simV2(TI3,35,2,25,60,60,60,true,0,0,cfg); // a 60% (equilibrio)
+  console.log("T"+t+" TI="+TI3.toFixed(3)+" dT="+r.dT.toFixed(3));
+  TI3=r.nTI;
+}
+</script>
+</body></html>

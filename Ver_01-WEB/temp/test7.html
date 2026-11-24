@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test7 - Modelo Final</title></head>
+<body>
+<script>
+// MODELO FINAL: Ventilação só resfria quando TI > TE
+// Quando TI < TE, ventilação é bloqueada pelo sistema
+// O resfriamento evaporativo e superresfriamento trabalham sozinhos
+const DT=30;
+
+function simFinal(TI,TE,VV,SP,b_pct,ex_pct,jl_pct,jsup,alm_pct,aqN){
+  // Constantes de tempo calibradas
+  const tau_cond     = 7200;  // 120min (isolamento moderado)
+  const tau_evap_b   = 350;   // base evaporação
+  const tau_super_b  = 200;   // base superresfriamento (forte!)
+  const T_aq_delta   = 30;    // aquecedores: até TE+30°C
+  const tau_aq_b     = 1200;  // velocidade aquecimento
+  
+  // 1. Condução natural (lenta, menor peso)
+  const dT_cond = (TE - TI) * DT / tau_cond;
+  
+  // 2. Solar
+  let Qs = TE>=28?0.18:TE>=20?0.09:TE>=12?0.03:0;
+  Qs *= (1-(alm_pct/100)*0.88);
+  const dT_solar = Qs;  // °C/tick fixo
+  
+  // 3. Ventilação: SÓ resfria quando TI > TE (ar externo mais frio)
+  //    Quando TI ≤ TE, o ar externo aquece; não deve ser usado para resfriamento
+  let dT_vent = 0;
+  if (TI > TE) {
+    // Ventilação natural arrasta TI→TE
+    const vf = (jl_pct/100)*0.6 + (jsup?1:0)*0.3 + (ex_pct/100)*0.5;
+    const tau_v = 1800 / (1 + vf * 3.5 + Math.min(2, VV/4));
+    dT_vent = (TE - TI) * DT / tau_v;  // negativo (resfria)
+  }
+  // Quando TI ≤ TE: as janelas precisam estar fechadas ou 
+  // apenas o evaporativo (que traz ar resfriado abaixo de TE) atua
+  
+  // 4. Resfriamento Evaporativo (Pad-and-Fan)
+  // Independente de TI vs TE: o pad resfria o ar abaixo de TE antes de entrar
+  const HR=0.55, eff=0.88;
+  const Tbwb = TE - (1-HR)*12;
+  const Tpad = TE - eff*(TE-Tbwb);  // ~30.25°C para TE=35
+  
+  const bf=b_pct/100, ef=ex_pct/100;
+  let dT_evap=0, dT_super=0;
+  
+  if (bf>0.02 && ef>0.02) {
+    // A. Resfriamento direto até T_pad
+    const tau_e = tau_evap_b/(bf*ef);
+    dT_evap = (Tpad - TI) * DT / tau_e;  // negativo quando TI > Tpad
+    
+    // B. Superresfriamento abaixo de T_pad até SP
+    //    Representa a eficiência extra do sistema a plena potência
+    //    Ativo quando TI > SP (ainda precisa resfriar)
+    if (TI > SP) {
+      const gap = Math.max(0, Tpad - SP);       // quanto SP está abaixo de Tpad
+      const dist = Math.max(0, TI - SP);         // quanto TI está acima de SP
+      // Força proporcional a ambos e ao nível dos atuadores
+      const force = Math.min(1, gap/8) * bf * ef;
+      if (force > 0) {
+        const tau_s = tau_super_b / force;
+        // Puxa TI em direção a SP
+        dT_super = -dist * DT / tau_s;
+      }
+    }
+  }
+  
+  // 5. Aquecimento
+  let dT_aq=0;
+  if(aqN>0){
+    const T_tgt = Math.min(TE + T_aq_delta*(aqN/4), 60);
+    const tau_a = tau_aq_b/(aqN/4);
+    dT_aq = (T_tgt - TI) * DT / tau_a;
+  }
+  
+  const dT = Math.max(-8, Math.min(8,
+    dT_cond + dT_solar + dT_vent + dT_evap + dT_super + dT_aq));
+  
+  return {nTI:Math.max(-5,Math.min(65,TI+dT)), dT, Tpad,
+    comps:{dT_cond,dT_solar,dT_vent,dT_evap,dT_super,dT_aq}};
+}
+
+// VERÃO
+console.log("=== VERÃO TI=38 TE=35 VV=2 SP=25 (bomba+exaustor=100%) ===");
+let TI=38;
+for(let t=1;t<=30;t++){
+  const r=simFinal(TI,35,2,25,100,100,100,true,0,0);
+  const c=r.comps;
+  if(t<=8||Math.abs(25-TI)<3)
+    console.log("T"+t+" TI="+TI.toFixed(2)+" dT="+r.dT.toFixed(3)+" vent="+c.dT_vent.toFixed(3)+" evap="+c.dT_evap.toFixed(3)+" super="+c.dT_super.toFixed(3));
+  TI=r.nTI;
+  if(Math.abs(25-TI)<0.5){console.log("✅ SP ATINGIDO T"+t+" TI="+TI.toFixed(3));break;}
+}
+console.log("FINAL VERAO "+TI.toFixed(3)+" E="+(25-TI).toFixed(3));
+
+// INVERNO
+console.log("=== INVERNO TI=8 TE=3 VV=5 SP=18 (aquecedores=4) ===");
+let TI2=8;
+for(let t=1;t<=35;t++){
+  const r=simFinal(TI2,3,5,18,0,0,0,false,0,4);
+  if(t<=6||Math.abs(18-TI2)<3)console.log("T"+t+" TI="+TI2.toFixed(2)+" dT="+r.dT.toFixed(3));
+  TI2=r.nTI;
+  if(Math.abs(18-TI2)<0.5){console.log("✅ SP ATINGIDO T"+t+" TI="+TI2.toFixed(3));break;}
+}
+console.log("FINAL INVERNO "+TI2.toFixed(3));
+
+// MANUTENÇÃO
+console.log("=== MANUTENÇÃO TI=25 TE=35 SP=25 (fuzzy ~60%) ===");
+let TI3=25;
+for(let t=1;t<=5;t++){
+  const r=simFinal(TI3,35,2,25,50,50,50,true,0,0);
+  console.log("T"+t+" TI="+TI3.toFixed(3)+" dT="+r.dT.toFixed(3));
+  TI3=r.nTI;
+}
+</script>
+</body></html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test</title></head>
+<body>
+<script>
+// Inline test - runs immediately
+const W=8,L=14,H=6,RHO=1.2,CP=1005,DT=30;
+
+function sim(TI,TE,VV,SP,b,ex,jl,jsup,alm,aqN){
+  const vol=W*L*H,m=vol*RHO,ac=W*L,ae=2*(W+L)*H+ac;
+  let rad=TE>=28?800:TE>=20?450:TE>=12?150:0;
+  const Ps=rad*ac*(1-(alm/100)*0.88)*0.07;
+  const Pc=5.5*ae*(TE-TI);
+  const Pa=aqN*1500;
+  const va=1+Math.min(3,VV/3.5);
+  const ach=(jl/100)*10*va+(jsup?1:0)*5*va+(ex/100)*20;
+  const fl=ach*vol/3600*RHO;
+  const Pv=fl*CP*(TI-TE);
+  const Tbwb=TE-(1-0.55)*12;
+  const Tpad=TE-0.88*(TE-Tbwb);
+  const bf=b/100,ef=ex/100;
+  const fp=ef*vol/3600*RHO*15;
+  const Pe=bf*fp*CP*Math.max(0,TI-Tpad);
+  let Psu=0;
+  if(SP<Tpad&&bf>0.05&&ef>0.05){const g=Math.min(10,Tpad-SP);Psu=Math.min(1,g/8)*(bf*370+ef*2*250)*2.5;}
+  const Pt=Ps+Pc+Pa-Pv-Pe-Psu;
+  const dT=Math.max(-8,Math.min(8,(Pt*DT)/(m*CP)));
+  return{nTI:Math.max(-5,Math.min(65,TI+dT)),dT,Tpad,ach};
+}
+
+// Summer test
+let TI=38,r;
+console.log("=== VERAO TI=38 TE=35 VV=2 SP=25 ===");
+const d=sim(38,35,2,25,100,100,100,true,0,0);
+console.log("Tpad="+d.Tpad.toFixed(2)+" ACH="+d.ach.toFixed(1)+" dT="+d.dT.toFixed(3));
+for(let t=1;t<=20;t++){
+  r=sim(TI,35,2,25,100,100,100,true,0,0);
+  console.log("T"+t+" TI="+TI.toFixed(3)+" dT="+r.dT.toFixed(3)+" E="+(25-TI).toFixed(3));
+  TI=r.nTI;
+  if(Math.abs(25-TI)<0.5){console.log("SETPOINT T"+t);break;}
+}
+console.log("FINAL TI="+TI.toFixed(3)+" E="+(25-TI).toFixed(3));
+
+// Winter test
+let TI2=8;
+console.log("=== INVERNO TI=8 TE=3 VV=5 SP=18 ===");
+for(let t=1;t<=30;t++){
+  r=sim(TI2,3,5,18,0,0,0,false,0,4);
+  console.log("T"+t+" TI="+TI2.toFixed(3)+" dT="+r.dT.toFixed(3)+" E="+(18-TI2).toFixed(3));
+  TI2=r.nTI;
+  if(Math.abs(18-TI2)<0.5){console.log("SETPOINT T"+t);break;}
+}
+console.log("FINAL TI="+TI2.toFixed(3)+" E="+(18-TI2).toFixed(3));
+</script>
+</body></html>

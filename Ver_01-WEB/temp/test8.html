@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test8 - Calibração Final</title></head>
+<body>
+<script>
+const DT=30;
+
+function simFinal(TI,TE,VV,SP,b_pct,ex_pct,jl_pct,jsup,alm_pct,aqN,p){
+  // p = parâmetros calibráveis
+  const dT_cond = (TE-TI)*DT/p.tc;
+  
+  let Qs = TE>=28?p.sol_hot:TE>=20?p.sol_warm:TE>=12?p.sol_cool:0;
+  Qs *= (1-(alm_pct/100)*0.88);
+  
+  let dT_vent=0;
+  if(TI>TE){
+    const vf=(jl_pct/100)*0.6+(jsup?1:0)*0.3+(ex_pct/100)*0.5;
+    const tv=p.tv_b/(1+vf*3.5+Math.min(2,VV/4));
+    dT_vent=(TE-TI)*DT/tv;
+  }
+  
+  const Tbwb=TE-(1-0.55)*12;
+  const Tpad=TE-0.88*(TE-Tbwb);
+  const bf=b_pct/100, ef=ex_pct/100;
+  let dT_evap=0, dT_super=0;
+  if(bf>0.02&&ef>0.02){
+    const te2=p.te_b/(bf*ef);
+    dT_evap=(Tpad-TI)*DT/te2;
+    if(TI>SP){
+      const gap=Math.max(0,Tpad-SP);
+      const dist=TI-SP;
+      const force=Math.min(1,gap/p.gap_norm)*bf*ef;
+      if(force>0) dT_super=-dist*DT/(p.ts_b/force);
+    }
+  }
+  
+  let dT_aq=0;
+  if(aqN>0){
+    const T_tgt=Math.min(TE+p.dT_aq_max*(aqN/4),60);
+    dT_aq=(T_tgt-TI)*DT/(p.ta_b/(aqN/4));
+  }
+  
+  const dT=Math.max(-8,Math.min(8, dT_cond+Qs+dT_vent+dT_evap+dT_super+dT_aq));
+  return{nTI:Math.max(-5,Math.min(65,TI+dT)),dT,Tpad,
+    c:{dT_cond,Qs,dT_vent,dT_evap,dT_super,dT_aq}};
+}
+
+function runTest(name,TI_init,TE,VV,SP,b,ex,jl,jsup,alm,aqN,p,maxTick=40){
+  let TI=TI_init, reached=false;
+  for(let t=1;t<=maxTick;t++){
+    const r=simFinal(TI,TE,VV,SP,b,ex,jl,jsup,alm,aqN,p);
+    TI=r.nTI;
+    if(Math.abs(SP-TI)<0.5){
+      console.log(name+" ✅ T"+t+" TI="+TI.toFixed(2)+" SP="+SP);
+      reached=true; break;
+    }
+  }
+  if(!reached) console.log(name+" ❌ FINAL TI="+TI.toFixed(2)+" E="+(SP-TI).toFixed(2));
+  return {reached, TI};
+}
+
+// Parâmetros alvo: verão ≤20 ticks, inverno ≤30 ticks
+// Ajuste iterativo
+const p = {
+  tc:       8000,   // condução: lenta (boa isolação)
+  sol_hot:  0.12,   // solar quente (menor para permitir SP=25)
+  sol_warm: 0.06,
+  sol_cool: 0.02,
+  tv_b:     1600,   // ventilação base
+  te_b:     300,    // evaporação base (mais eficiente)
+  ts_b:     120,    // superresfriamento base (muito forte)
+  gap_norm: 10,     // normalização do gap SP-Tpad
+  dT_aq_max:35,     // aquecedores: TE+35°C máx
+  ta_b:     900,    // aquecimento base
+};
+
+console.log("=== PARÂMETROS: tc="+p.tc+" sol_hot="+p.sol_hot+" te_b="+p.te_b+" ts_b="+p.ts_b+" ===");
+runTest("VERAO(38→25)",  38,35,2, 25,100,100,100,true, 0,0,p,40);
+runTest("INV  (8→18)",    8, 3,5, 18,  0,  0,  0,false,0,4,p,40);
+runTest("MANHA(22→22)",  22,18,4, 22,  0,  0,  0,false,0,0,p,10);
+runTest("QUENTE(34→25)", 34,28,3, 25,100,100,100,true, 0,0,p,30);
+runTest("NOITE (30→26)", 30,25,3, 26, 70, 70, 70,true, 0,0,p,20);
+
+// Verificar manutenção: quando TI=SP, sistema não deve derivar
+console.log("--- MANUTENÇÃO TI=25=SP, TE=35 ---");
+let TI_m=25;
+for(let t=1;t<=6;t++){
+  // A fuzzy vai reduzir a potência, usar 30% como estimativa de manutenção
+  const r=simFinal(TI_m,35,2,25,30,30,30,false,80,0,p);
+  console.log("T"+t+" TI="+TI_m.toFixed(3)+" dT="+r.dT.toFixed(3));
+  TI_m=r.nTI;
+}
+</script>
+</body></html>

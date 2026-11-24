@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test11 - Inverno Fix</title></head>
+<body>
+<script>
+const DT=30;
+
+function simFinal(TI,TE,VV,SP,b,ex,jl,jsup,alm,aqN,p){
+  const dT_cond=(TE-TI)*DT/p.tc;
+  let Qs=TE>=28?p.sh:TE>=20?p.sw:TE>=12?p.sc:0;
+  Qs*=(1-(alm/100)*0.88);
+  let dT_vent=0;
+  if(TI>TE){
+    const vf=(jl/100)*0.6+(jsup?1:0)*0.3+(ex/100)*0.5;
+    dT_vent=(TE-TI)*DT/(p.tvb/(1+vf*3.5+Math.min(2,VV/4)));
+  }
+  const Tpad=TE-0.88*(TE-(TE-(1-0.55)*12));
+  const bf=b/100,ef=ex/100;
+  let dT_evap=0,dT_super=0;
+  if(bf>0.02&&ef>0.02){
+    if(TI>Tpad) dT_evap=(Tpad-TI)*DT/(p.teb/(bf*ef));
+    if(TI>SP){
+      const gap=Math.max(0,Tpad-SP);
+      const force=Math.min(1,gap/p.gn)*bf*ef;
+      if(force>0.01) dT_super=-(TI-SP)*DT/(p.tsb/force);
+    }
+  }
+  let dT_aq=0;
+  if(aqN>0){
+    const Tt=Math.min(TE+p.dta*(aqN/4),60);
+    dT_aq=(Tt-TI)*DT/(p.tab/(aqN/4));
+  }
+  const dT=Math.max(-8,Math.min(8,dT_cond+Qs+dT_vent+dT_evap+dT_super+dT_aq));
+  return{nTI:Math.max(-5,Math.min(65,TI+dT)),dT,Tpad};
+}
+
+function run(name,TI0,TE,VV,SP,b,ex,jl,jsup,alm,aqN,p,mx=50){
+  let TI=TI0,ok=false;
+  for(let t=1;t<=mx;t++){
+    const r=simFinal(TI,TE,VV,SP,b,ex,jl,jsup,alm,aqN,p);
+    TI=r.nTI;
+    if(Math.abs(SP-TI)<0.5){console.log(name+" ✅ T"+t+" TI="+TI.toFixed(2));ok=true;break;}
+  }
+  if(!ok)console.log(name+" ❌ TI="+TI.toFixed(2)+" E="+(SP-TI).toFixed(2));
+}
+
+// Base que funciona para o verão
+// Preciso aumentar dta ou diminuir tab para o inverno convergir
+// Análise: equilíbrio do inverno:
+// dT_aq = (TE+dta - TI)*DT/(tab/(4/4)) = (3+dta-TI)*30/tab
+// dT_cond = (3-TI)*30/8000  (negativo quando TI>3)
+// No equilíbrio: dT_aq + dT_cond = 0
+// (3+dta-TI)*30/tab + (3-TI)*30/8000 = 0
+// Se TI=18 (SP): (3+dta-18)/tab + (3-18)/8000 = 0
+//                (dta-15)/tab = 15/8000
+//                tab = 8000*(dta-15)/15
+// Para dta=35: tab = 8000*20/15 = 10667 → aquecedor fraco demais!
+// Para o sistema chegar a 18: tab deve ser menor que 10667
+
+// Teste com diferentes tab
+for(const tab of [600,700,800,900]){
+  const p={tc:8000,sh:0.08,sw:0.05,sc:0.015,tvb:1600,teb:280,tsb:55,gn:10,dta:35,tab};
+  console.log("--- tab="+tab+" ---");
+  run("V38→25",38,35,2,25,100,100,100,true,0,0,p,40);
+  run("I 8→18", 8, 3,5,18,  0,  0,  0,false,0,4,p,40);
+  run("Q34→25",34,28,3,25,100,100,100,true,0,0,p,30);
+  // Manutenção (TI=SP=25, TE=35, 15% power)
+  let TIm=25;
+  for(let k=0;k<8;k++){const r=simFinal(TIm,35,2,25,15,15,20,false,90,0,p);TIm=r.nTI;}
+  console.log("  MAN final="+TIm.toFixed(2)+(Math.abs(TIm-25)<1?" ✅":" ❌"));
+}
+</script>
+</body></html>

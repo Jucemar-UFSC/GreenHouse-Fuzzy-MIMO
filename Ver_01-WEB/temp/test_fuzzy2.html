@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test Fuzzy</title></head>
+<body>
+<script src="../js/fuzzy-engine.js"></script>
+<script>
+const TE=35, VV=2, SP=25;
+fuzzyEngine.reset();
+
+// Ver o REF puro com E fixo
+for(const E_val of [-13,-8,-5,-3,-2,-1.5,-1.3,-1,-0.8,-0.5,0]){
+  // Para calcular REF puro, simular sem dE
+  fuzzyEngine._erroAnterior = null; // reset dE
+  // Injetar TI correspondente
+  const TI = SP - E_val;
+  const r = fuzzyEngine.computar(TI, TE, VV, SP);
+  const {saidas,refCrisp,heaCrisp,erro,dErro} = r;
+  console.log("E="+E_val.toFixed(1).padStart(6)+" REF="+refCrisp.toFixed(1).padStart(5)+" HEA="+heaCrisp.toFixed(1).padStart(5)+" Bomba="+saidas.bomba.toFixed(0).padStart(3)+"% Alum="+saidas.aluminet.toFixed(0).padStart(3)+"% dE="+dErro.toFixed(3));
+}
+
+console.log("--- REGRAS ATIVAS TI=26.3 E=-1.3 ---");
+fuzzyEngine._erroAnterior = null;
+const r0=fuzzyEngine.computar(26.3,35,2,25);
+r0.regrasAtivas.forEach(ra=>console.log(" "+ra.id+" f="+ra.forca+" "+ra.desc));
+</script>
+</body></html>

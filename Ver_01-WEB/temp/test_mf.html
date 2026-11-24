@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test Fuzzy Inline</title></head>
+<body>
+<script>
+// Copiar apenas o necessário do fuzzy-engine.js inline
+const FuzzyMF={
+  trapmf(x,a,b,c,d){if(x<=a||x>=d)return 0;if(x>=b&&x<=c)return 1;if(x>a&&x<b)return(x-a)/(b-a);return(d-x)/(d-c);},
+  trimf(x,a,b,c){if(x<=a||x>=c)return 0;if(x===b)return 1;if(x<b)return(x-a)/(b-a);return(c-x)/(c-b);}
+};
+const MF_ERRO={
+  MN:(e)=>FuzzyMF.trapmf(e,-30,-25,-8,-4),
+  N: (e)=>FuzzyMF.trimf(e,-8,-4,-0.5),
+  Z: (e)=>FuzzyMF.trimf(e,-1.5,0,1.5),
+  P: (e)=>FuzzyMF.trimf(e,0.5,4,8),
+  MP:(e)=>FuzzyMF.trapmf(e,4,8,25,30)
+};
+const MF_TE={
+  Fria:(t)=>FuzzyMF.trapmf(t,-10,-5,8,16),
+  Amena:(t)=>FuzzyMF.trimf(t,12,20,28),
+  Quente:(t)=>FuzzyMF.trapmf(t,24,30,45,55)
+};
+const MF_VV={
+  Fraco:(v)=>FuzzyMF.trapmf(v,-1,0,3,6),
+  Medio:(v)=>FuzzyMF.trimf(v,4,7,11),
+  Forte:(v)=>FuzzyMF.trapmf(v,9,12,15,20)
+};
+const MF_DE={
+  N:(de)=>FuzzyMF.trapmf(de,-8,-4,-0.8,-0.1),
+  Z:(de)=>FuzzyMF.trimf(de,-0.5,0,0.5),
+  P:(de)=>FuzzyMF.trapmf(de,0.1,0.8,4,8)
+};
+
+// Verificar REF para cada valor de E com dE=0
+function calcREF(E_val, TE_val, VV_val, dE_val){
+  const muE={}, muDE={}, muTE={}, muVV={};
+  for(const[k,f] of Object.entries(MF_ERRO)) muE[k]=Math.max(0,Math.min(1,f(E_val)));
+  for(const[k,f] of Object.entries(MF_DE))   muDE[k]=Math.max(0,Math.min(1,f(dE_val)));
+  for(const[k,f] of Object.entries(MF_TE))   muTE[k]=Math.max(0,Math.min(1,f(TE_val)));
+  for(const[k,f] of Object.entries(MF_VV))   muVV[k]=Math.max(0,Math.min(1,f(VV_val)));
+  
+  // Anti-windup baseado no erro
+  if(E_val >= -0.3) return 0; // não resfriar quando erro próximo ou positivo
+  
+  // Regras simplificadas para teste
+  const REGRAS=[
+    ['MN','N','Quente','Fraco',90,0],['MN','Z','Quente','Fraco',90,0],['MN','P','Quente','Fraco',90,0],
+    ['N','N','Quente','Fraco',65,0],['N','Z','Quente','Fraco',65,0],['N','P','Quente','Fraco',40,0],
+    ['N','N','Quente','Medio',40,0],['N','Z','Quente','Medio',40,0],['N','P','Quente','Medio',20,0],
+    ['Z','N','Quente','*',20,0],['Z','Z','Quente','*',0,0],
+  ];
+  
+  let rN=0,rD=0;
+  for(const[eK,deK,teK,vvK,rc,hc] of REGRAS){
+    const muE_v=muE[eK]||0, muDE_v=muDE[deK]||0, muTE_v=muTE[teK]||0;
+    const muVV_v=vvK==='*'?1:(muVV[vvK]||0);
+    const f=Math.min(muE_v,muDE_v,muTE_v,muVV_v);
+    if(f>0.005){rN+=rc*f;rD+=f;}
+  }
+  return rD>0?rN/rD:0;
+}
+
+console.log("E_val | muMN | muN  | muZ  | muP  | muMP | REF(dE=0)");
+for(const E of [-13,-8,-5,-3,-2,-1.5,-1.3,-1,-0.8,-0.5,-0.3,0]){
+  const muMN=MF_ERRO.MN(E).toFixed(3);
+  const muN= MF_ERRO.N(E).toFixed(3);
+  const muZ= MF_ERRO.Z(E).toFixed(3);
+  const muP= MF_ERRO.P(E).toFixed(3);
+  const muMP=MF_ERRO.MP(E).toFixed(3);
+  const REF=calcREF(E,35,2,0).toFixed(1);
+  console.log(E.toFixed(1).padStart(5)+" | "+muMN+" | "+muN+" | "+muZ+" | "+muP+" | "+muMP+" | "+REF);
+}
+</script>
+</body></html>

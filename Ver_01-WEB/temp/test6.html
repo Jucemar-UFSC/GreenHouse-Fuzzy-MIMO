@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test6</title></head>
+<body>
+<script>
+const DT=30;
+function simV2(TI,TE,VV,SP,b,ex,jl,jsup,alm,aqN,cfg){
+  const {tau_cond,tau_vent_base,tau_evap_base,tau_super_base,T_aq_max_delta,tau_aq_base}=cfg;
+  const dT_cond=(TE-TI)*DT/tau_cond;
+  let Qs=TE>=28?0.20:TE>=20?0.10:TE>=12?0.04:0;
+  Qs*=(1-(alm/100)*0.88);
+  const dT_solar=Qs*DT/30;
+  const vf=(jl/100)*0.5+(jsup?1:0)*0.25+(ex/100)*0.4;
+  const tv=tau_vent_base/(1+vf*4);
+  const dT_vent=(TE-TI)*DT/tv;
+  const HR=0.55,eff=0.88;
+  const Tbwb=TE-(1-HR)*12;
+  const Tpad=TE-eff*(TE-Tbwb);
+  const bf=b/100,ef=ex/100;
+  let dT_evap=0,dT_super=0;
+  if(bf>0.02&&ef>0.02){
+    const te2=tau_evap_base/(bf*ef);
+    dT_evap=(Tpad-TI)*DT/te2;
+    if(SP<Tpad&&TI>SP){
+      const gap=Math.min(10,Tpad-SP);
+      const force=Math.min(1,gap/6)*bf*ef;
+      dT_super=(SP-TI)*DT/(tau_super_base/force);
+    }
+  }
+  let dT_aq=0;
+  if(aqN>0){
+    const Tt=Math.min(TE+T_aq_max_delta*(aqN/4),60);
+    dT_aq=(Tt-TI)*DT/(tau_aq_base/(aqN/4));
+  }
+  const dT=Math.max(-8,Math.min(8,dT_cond+dT_solar+dT_vent+dT_evap+dT_super+dT_aq));
+  return{nTI:Math.max(-5,Math.min(65,TI+dT)),dT,Tpad};
+}
+
+const cfg={tau_cond:6000,tau_vent_base:1800,tau_evap_base:400,tau_super_base:300,T_aq_max_delta:25,tau_aq_base:1500};
+
+// VERÃO - 60 ticks
+let TI=38;
+let last=-999;
+for(let t=1;t<=60;t++){
+  const r=simV2(TI,35,2,25,100,100,100,true,0,0,cfg);
+  TI=r.nTI;
+  if(Math.abs(TI-last)<0.001){console.log("EQUIL T"+t+" TI="+TI.toFixed(4));break;}
+  if(Math.abs(25-TI)<0.5){console.log("✅ SP T"+t+" TI="+TI.toFixed(3));break;}
+  last=TI;
+}
+console.log("FINAL VERAO "+TI.toFixed(3)+" E="+(25-TI).toFixed(3));
+
+// Analisar forças no equilíbrio
+const TIeq=TI;
+const dT_cond=(35-TIeq)*DT/6000;
+const dT_solar=0.20*DT/30;
+const vf=(100/100)*0.5+(1)*0.25+(100/100)*0.4;
+const tv=1800/(1+vf*4);
+const dT_vent=(35-TIeq)*DT/tv;
+const Tpad=35-0.88*(35-(35-(1-0.55)*12));
+const dT_evap=(Tpad-TIeq)*DT/(400);
+const gap=Math.min(10,Tpad-25);
+const force=Math.min(1,gap/6);
+const dT_super=(25-TIeq)*DT/(300/force);
+console.log("Análise equilíbrio TI="+TIeq.toFixed(3)+":");
+console.log("  dT_cond="+dT_cond.toFixed(4));
+console.log("  dT_solar="+dT_solar.toFixed(4));
+console.log("  dT_vent="+dT_vent.toFixed(4));
+console.log("  dT_evap="+dT_evap.toFixed(4)+" Tpad="+Tpad.toFixed(2));
+console.log("  dT_super="+dT_super.toFixed(4)+" gap="+gap.toFixed(2)+" force="+force.toFixed(3));
+console.log("  SOMA="+(dT_cond+dT_solar+dT_vent+dT_evap+dT_super).toFixed(4));
+</script>
+</body></html>

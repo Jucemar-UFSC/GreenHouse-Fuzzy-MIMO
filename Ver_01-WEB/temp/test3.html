@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test2</title></head>
+<body>
+<script>
+// Testa com diferentes valores de U para encontrar os corretos
+const W=8,L=14,H=6,RHO=1.2,CP=1005,DT=30;
+
+function sim(TI,TE,VV,SP,b,ex,jl,jsup,alm,aqN, U_val, evap_mult, super_cop){
+  const vol=W*L*H,m=vol*RHO,ac=W*L,ae=2*(W+L)*H+ac;
+  let rad=TE>=28?800:TE>=20?450:TE>=12?150:0;
+  const Ps=rad*ac*(1-(alm/100)*0.88)*0.07;
+  const Pc=U_val*ae*(TE-TI);
+  const Pa=aqN*1500;
+  const va=1+Math.min(3,VV/3.5);
+  const ach=(jl/100)*10*va+(jsup?1:0)*5*va+(ex/100)*20;
+  const fl=ach*vol/3600*RHO;
+  const Pv=fl*CP*(TI-TE);
+  const Tbwb=TE-(1-0.55)*12;
+  const Tpad=TE-0.88*(TE-Tbwb);
+  const bf=b/100,ef=ex/100;
+  const fp=ef*vol/3600*RHO*evap_mult;
+  const Pe=bf*fp*CP*Math.max(0,TI-Tpad);
+  let Psu=0;
+  if(SP<Tpad&&bf>0.05&&ef>0.05){
+    const g=Math.min(10,Tpad-SP);
+    Psu=Math.min(1,g/8)*(bf*370+ef*2*250)*super_cop;
+  }
+  const Pt=Ps+Pc+Pa-Pv-Pe-Psu;
+  const dT=Math.max(-8,Math.min(8,(Pt*DT)/(m*CP)));
+  return{nTI:Math.max(-5,Math.min(65,TI+dT)),dT,Tpad,ach,Ps,Pc,Pv,Pe,Psu,Pt};
+}
+
+// Procurar valores ideais de U
+// Requisito 1: verão com bombas ligadas deve convergir para 25
+// Requisito 2: inverno com aquecedores deve convergir para 18
+
+// U muito alto → perde muito calor no inverno / ganha muito no verão
+// Vamos testar U=1.5 (estufa com filme duplo)
+const U=1.5, EM=12, COP=3.0;
+
+console.log("=== U="+U+" evap_mult="+EM+" COP="+COP+" ===");
+console.log("--- VERAO TI=38 TE=35 VV=2 SP=25 ---");
+let TI=38;
+const d0=sim(38,35,2,25,100,100,100,true,0,0,U,EM,COP);
+console.log("TICK1: Ps="+d0.Ps.toFixed(0)+" Pc="+d0.Pc.toFixed(0)+" Pv="+d0.Pv.toFixed(0)+" Pe="+d0.Pe.toFixed(0)+" Psu="+d0.Psu.toFixed(0)+" Tot="+d0.Pt.toFixed(0)+" dT="+d0.dT.toFixed(3)+" Tpad="+d0.Tpad.toFixed(2));
+for(let t=1;t<=25;t++){
+  const r=sim(TI,35,2,25,100,100,100,true,0,0,U,EM,COP);
+  TI=r.nTI;
+  if(t<=6||Math.abs(25-TI)<1)console.log("T"+t+" TI="+TI.toFixed(3)+" dT="+r.dT.toFixed(3)+" E="+(25-TI).toFixed(3));
+  if(Math.abs(25-TI)<0.5){console.log("SETPOINT T"+t);break;}
+}
+console.log("FINAL VERAO TI="+TI.toFixed(3));
+
+console.log("--- INVERNO TI=8 TE=3 VV=5 SP=18 ---");
+let TI2=8;
+const d1=sim(8,3,5,18,0,0,0,false,0,4,U,EM,COP);
+console.log("TICK1: Ps="+d1.Ps.toFixed(0)+" Pc="+d1.Pc.toFixed(0)+" Pa="+d1.Pt.toFixed(0)+" dT="+d1.dT.toFixed(3));
+for(let t=1;t<=30;t++){
+  const r=sim(TI2,3,5,18,0,0,0,false,0,4,U,EM,COP);
+  TI2=r.nTI;
+  if(t<=6||Math.abs(18-TI2)<1)console.log("T"+t+" TI="+TI2.toFixed(3)+" dT="+r.dT.toFixed(3));
+  if(Math.abs(18-TI2)<0.5){console.log("SETPOINT T"+t);break;}
+}
+console.log("FINAL INVERNO TI="+TI2.toFixed(3));
+
+// Também testar sem ventilação no inverno (janelas fechadas)
+console.log("--- INVERNO sem vento (VV=5 mas janelas fechadas) ---");
+let TI3=8;
+for(let t=1;t<=30;t++){
+  const r=sim(TI3,3,5,18,0,0,0,false,0,4,U,EM,COP);
+  TI3=r.nTI;
+  if(t<=3||Math.abs(18-TI3)<0.5)console.log("T"+t+" TI="+TI3.toFixed(3)+" dT="+r.dT.toFixed(3));
+  if(Math.abs(18-TI3)<0.5){console.log("SETPOINT T"+t);break;}
+}
+console.log("FINAL TI="+TI3.toFixed(3));
+</script>
+</body></html>

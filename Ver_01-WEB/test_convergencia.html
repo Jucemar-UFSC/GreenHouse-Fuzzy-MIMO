@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Teste Integração</title></head>
+<body>
+<script src="js/fuzzy-engine.js"></script>
+<script src="js/simulation.js"></script>
+<script>
+function atualizarUI(){}
+function atualizarGraficos(){}
+function atualizarResultados(){}
+function adicionarLog(){}
+function adicionarLogManual(){}
+function clearLog(){}
+function updateAllDisplays(){}
+function updateGreenhouseSVG(){}
+function drawMembershipFunctions(){}
+function resetGraficos(){}
+function atualizarGraficoANFIS(){}
+function showToast(){}
+function updateSimStatusDot(){}
+
+function testCenario(nome, TI_ini, TE, VV, SP, maxTick){
+  SIM_STATE.TI=TI_ini; SIM_STATE.TE=TE; SIM_STATE.VV=VV; SIM_STATE.SP=SP;
+  SIM_STATE.sim_onoff_TI=TI_ini; SIM_STATE.tick=0; SIM_STATE.sim_seconds=0;
+  SIM_STATE.running=true; SIM_STATE.paused=false;
+  SIM_STATE.bomba_pct=0; SIM_STATE.exaustor_pct=0; SIM_STATE.aquecedor_pct=0;
+  SIM_STATE.jan_lat_pct=0; SIM_STATE.jan_lat_atual=0;
+  SIM_STATE.aluminet_pct=0; SIM_STATE.jan_sup_pct=0;
+  SIM_STATE.tp_bomba={tempoON:0,tempoOFF:60,percentual:0,ativo:false};
+  SIM_STATE.tp_exaustor={tempoON:0,tempoOFF:60,percentual:0,ativo:false};
+  SIM_STATE.aquecedor_estagio={numAtivos:0,estagio:0,nome:'DESLIGADO'};
+  SIM_STATE.jan_sup_aberta=false; SIM_STATE.aluminet_fechado=false;
+  fuzzyEngine.reset();
+
+  console.log("=== "+nome+" TI="+TI_ini+" TE="+TE+" VV="+VV+" SP="+SP+" ===");
+  let converged=false;
+  for(let t=1;t<=maxTick;t++){
+    executarTick();
+    const TI=SIM_STATE.TI, E=SP-TI;
+    const ref=SIM_STATE.ref_crisp_last;
+    const b=SIM_STATE.bomba_pct, ex=SIM_STATE.exaustor_pct;
+    const alm=SIM_STATE.aluminet_pct;
+    if(t<=3 || Math.abs(E)<1.5)
+      console.log("T"+t+" TI="+TI.toFixed(2)+" E="+E.toFixed(2)+" REF="+ref.toFixed(1)+" B="+b.toFixed(0)+"% Alm="+alm.toFixed(0)+"%");
+    if(Math.abs(E)<0.5){
+      console.log("✅ SETPOINT ATINGIDO T"+t+" TI="+TI.toFixed(2)+" SP="+SP);
+      converged=true; break;
+    }
+  }
+  if(!converged) console.log("❌ NÃO CONVERGIU FINAL TI="+SIM_STATE.TI.toFixed(2)+" E="+(SP-SIM_STATE.TI).toFixed(2));
+}
+
+testCenario("VERÃO",      38, 35, 2, 25, 100);
+testCenario("INVERNO",     8,  3, 5, 18,  50);
+testCenario("QUENTE",     34, 28, 3, 25,  60);
+testCenario("MANHÃ",      22, 18, 4, 22,  10);
+testCenario("TEMPESTADE", 20, 15,13, 20,  10);
+testCenario("NOITE_Q",    30, 25, 3, 26,  20);
+testCenario("NUBLADO",    12,  8, 6, 20,  50);
+</script>
+</body></html>

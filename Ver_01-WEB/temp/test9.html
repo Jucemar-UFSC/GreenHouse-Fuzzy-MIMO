@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test9 - Final</title></head>
+<body>
+<script>
+const DT=30;
+
+function simFinal(TI,TE,VV,SP,b,ex,jl,jsup,alm,aqN,p){
+  const dT_cond=(TE-TI)*DT/p.tc;
+  let Qs=TE>=28?p.sh:TE>=20?p.sw:TE>=12?p.sc:0;
+  Qs*=(1-(alm/100)*0.88);
+  let dT_vent=0;
+  if(TI>TE){
+    const vf=(jl/100)*0.6+(jsup?1:0)*0.3+(ex/100)*0.5;
+    const tv=p.tvb/(1+vf*3.5+Math.min(2,VV/4));
+    dT_vent=(TE-TI)*DT/tv;
+  }
+  const Tpad=TE-0.88*(TE-(TE-(1-0.55)*12));
+  const bf=b/100,ef=ex/100;
+  let dT_evap=0,dT_super=0;
+  if(bf>0.02&&ef>0.02){
+    dT_evap=(Tpad-TI)*DT/(p.teb/(bf*ef));
+    if(TI>SP){
+      const gap=Math.max(0,Tpad-SP);
+      const dist=TI-SP;
+      const force=Math.min(1,gap/p.gn)*bf*ef;
+      if(force>0) dT_super=-dist*DT/(p.tsb/force);
+    }
+  }
+  let dT_aq=0;
+  if(aqN>0){
+    const Tt=Math.min(TE+p.dta*(aqN/4),60);
+    dT_aq=(Tt-TI)*DT/(p.tab/(aqN/4));
+  }
+  const dT=Math.max(-8,Math.min(8,dT_cond+Qs+dT_vent+dT_evap+dT_super+dT_aq));
+  return{nTI:Math.max(-5,Math.min(65,TI+dT)),dT,Tpad};
+}
+
+function run(name,TI0,TE,VV,SP,b,ex,jl,jsup,alm,aqN,p,mx=50){
+  let TI=TI0,ok=false;
+  for(let t=1;t<=mx;t++){
+    const r=simFinal(TI,TE,VV,SP,b,ex,jl,jsup,alm,aqN,p);
+    TI=r.nTI;
+    if(Math.abs(SP-TI)<0.5){console.log(name+" ✅ T"+t+" TI="+TI.toFixed(2));ok=true;break;}
+  }
+  if(!ok)console.log(name+" ❌ TI="+TI.toFixed(2)+" E="+(SP-TI).toFixed(2));
+}
+
+// Variar ts_b e sh para encontrar valores que convergem todos os cenários
+const tests=[
+  {sh:0.10,tsb:80},
+  {sh:0.08,tsb:80},
+  {sh:0.08,tsb:60},
+  {sh:0.06,tsb:60},
+];
+
+const base={tc:8000,sw:0.05,sc:0.015,tvb:1600,teb:300,gn:10,dta:35,tab:900};
+
+for(const t of tests){
+  const p={...base,...t};
+  console.log("--- sh="+p.sh+" tsb="+p.tsb+" ---");
+  run("V38→25 ",38,35,2,25,100,100,100,true,0,0,p,40);
+  run("I 8→18 ", 8, 3,5,18,  0,  0,  0,false,0,4,p,40);
+  run("Q34→25 ",34,28,3,25,100,100,100,true,0,0,p,30);
+  // Manutenção: TI=SP, deve ficar estável
+  let TIm=25, stable=true;
+  for(let k=1;k<=10;k++){
+    const r=simFinal(TIm,35,2,25,20,20,30,false,90,0,p);
+    TIm=r.nTI;
+    if(Math.abs(TIm-25)>1)stable=false;
+  }
+  console.log("MAN(TI=SP) final="+TIm.toFixed(3)+(stable?" ✅":" ❌ deriva!"));
+}
+</script>
+</body></html>

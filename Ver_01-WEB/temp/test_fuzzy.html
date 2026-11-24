@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test Regras Fuzzy</title></head>
+<body>
+<script src="../js/fuzzy-engine.js"></script>
+<script>
+// Teste do motor fuzzy: o que acontece quando TI=26.3, TE=35, SP=25
+// Isso simula o estado do equilíbrio incorreto
+const TE=35, VV=2, SP=25;
+
+// Simular uma sequência de ticks para ver a oscilação
+let TI=26.3;
+console.log("=== ANÁLISE FUZZY: TI=26.3, TE=35, VV=2, SP=25 ===");
+fuzzyEngine.reset();
+for(let t=1;t<=6;t++){
+  const r = fuzzyEngine.computar(TI, TE, VV, SP);
+  const {saidas, erro, dErro} = r;
+  console.log("T"+t+" TI="+TI.toFixed(2)+
+    " E="+erro.toFixed(3)+
+    " dE="+dErro.toFixed(3)+
+    " REF="+r.refCrisp.toFixed(1)+
+    " HEA="+r.heaCrisp.toFixed(1)+
+    " Bomba="+saidas.bomba.toFixed(0)+"%"+
+    " Alum="+saidas.aluminet.toFixed(0)+"%");
+  // Simular uma pequena descida
+  TI -= 0.1;
+}
+
+console.log("--- REGRAS ATIVAS com TI=26.3, dE~=0 ---");
+fuzzyEngine.reset();
+const r0 = fuzzyEngine.computar(26.3, 35, 2, 25);
+r0.regrasAtivas.forEach(ra => {
+  console.log(" "+ra.id+" ("+ra.forca+") "+ra.desc);
+});
+
+console.log("--- REGRAS ATIVAS com TI=26.3, dE>0 (esfriando) ---");
+const r1 = fuzzyEngine.computar(26.3, 35, 2, 25);
+console.log(" REF="+r1.refCrisp.toFixed(1)+" dE="+r1.erro.toFixed(2));
+r1.regrasAtivas.forEach(ra => {
+  console.log(" "+ra.id+" ("+ra.forca+") "+ra.desc);
+});
+
+// Teste E=-1.3 fixo para ver o REF ideal
+console.log("--- REF puro com E=-1.3 dE=0 TE=Quente VV=Fraco ---");
+const muE = {MN:0, N: require_MF_N(-1.3), Z:0, P:0, MP:0};
+function require_MF_N(e){ 
+  // trimf(-8,-4,-0.5) 
+  if(e<=-8||e>=-0.5) return 0;
+  if(e<-4) return (e-(-8))/(-4-(-8));
+  return (-0.5-e)/(-0.5-(-4));
+}
+console.log("MF_N(-1.3)="+require_MF_N(-1.3).toFixed(3));
+</script>
+</body></html>

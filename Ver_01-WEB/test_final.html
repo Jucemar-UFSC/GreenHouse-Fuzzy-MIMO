@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Teste Final</title></head>
+<body>
+<script src="js/fuzzy-engine.js"></script>
+<script src="js/simulation.js"></script>
+<script>
+// Stubs UI
+['atualizarUI','atualizarGraficos','atualizarResultados','adicionarLog',
+ 'adicionarLogManual','clearLog','updateAllDisplays','updateGreenhouseSVG',
+ 'drawMembershipFunctions','resetGraficos','atualizarGraficoANFIS',
+ 'showToast','updateSimStatusDot'].forEach(fn => window[fn] = ()=>{});
+
+function testCenario(nome, TI_ini, TE, VV, SP, maxTick){
+  // Reset completo do estado
+  SIM_STATE.TI=TI_ini; SIM_STATE.TE=TE; SIM_STATE.VV=VV; SIM_STATE.SP=SP;
+  SIM_STATE.sim_onoff_TI=TI_ini; SIM_STATE.tick=0; SIM_STATE.sim_seconds=0;
+  SIM_STATE.running=true; SIM_STATE.paused=false;
+  SIM_STATE.bomba_pct=0; SIM_STATE.exaustor_pct=0; SIM_STATE.aquecedor_pct=0;
+  SIM_STATE.jan_lat_pct=0; SIM_STATE.jan_lat_atual=0;
+  SIM_STATE.aluminet_pct=0; SIM_STATE.jan_sup_pct=0;
+  SIM_STATE.tp_bomba={tempoON:0,tempoOFF:60,percentual:0,ativo:false};
+  SIM_STATE.tp_exaustor={tempoON:0,tempoOFF:60,percentual:0,ativo:false};
+  SIM_STATE.aquecedor_estagio={numAtivos:0,estagio:0,nome:'DESLIGADO'};
+  SIM_STATE.jan_sup_aberta=false; SIM_STATE.aluminet_fechado=false;
+  SIM_STATE.integral_ref=0; SIM_STATE.integral_hea=0;
+  SIM_STATE.erros_abs=[]; SIM_STATE.erros_sq=[];
+  SIM_STATE.ticks_no_sp=0; SIM_STATE.overshoot_max=0;
+  SIM_STATE.tempo_setpoint=null;
+  SIM_STATE.historico_ti=[]; SIM_STATE.historico_te=[];
+  SIM_STATE.historico_sp=[]; SIM_STATE.historico_vv=[];
+  SIM_STATE.historico_bomba=[]; SIM_STATE.historico_exaustor=[];
+  SIM_STATE.historico_aquecedor=[]; SIM_STATE.historico_jan_lat=[];
+  SIM_STATE.historico_power=[]; SIM_STATE.historico_tempo=[];
+  fuzzyEngine.reset();
+
+  console.log("=== "+nome+" TI="+TI_ini+"°C TE="+TE+"°C VV="+VV+"m/s SP="+SP+"°C ===");
+  let converged=false, lastTI=TI_ini;
+  let overshoot=0;
+
+  for(let t=1;t<=maxTick;t++){
+    executarTick();
+    const TI=SIM_STATE.TI, E=SP-TI;
+    const ref=SIM_STATE.ref_crisp_last;
+    const b=SIM_STATE.bomba_pct, ex=SIM_STATE.exaustor_pct;
+    const aq=SIM_STATE.aquecedor_pct;
+    const alm=SIM_STATE.aluminet_pct;
+    const Iref=SIM_STATE.integral_ref||0;
+
+    // Calcular overshoot (TI ultrapassou SP na direção oposta à inicial)
+    if(TI_ini > SP){ // resfriamento
+      if(TI < SP - 0.5) overshoot = Math.max(overshoot, SP-TI);
+    } else { // aquecimento
+      if(TI > SP + 0.5) overshoot = Math.max(overshoot, TI-SP);
+    }
+
+    // Log apenas ticks significativos
+    if(t<=2 || (t%10===0) || Math.abs(E)<0.5){
+      const dir = TI > lastTI ? '↑' : (TI < lastTI ? '↓' : '→');
+      console.log("  T"+String(t).padStart(3)+" TI="+TI.toFixed(2)+"°C E="+(E>=0?'+':'')+E.toFixed(2)+" "+dir+
+        " REF="+ref.toFixed(0)+"% B="+b.toFixed(0)+"% Aq="+aq.toFixed(0)+"% Alm="+alm.toFixed(0)+"% Iref="+Iref.toFixed(0));
+    }
+    lastTI=TI;
+
+    if(Math.abs(E)<0.5){
+      const tempo_sim = t*30; // segundos de simulação
+      const ticks_no_sp = SIM_STATE.ticks_no_sp;
+      console.log("  ✅ SETPOINT T"+t+" TI="+TI.toFixed(2)+"°C ("+Math.floor(tempo_sim/60)+"min"+
+        (tempo_sim%60)+"s sim.) | Overshoot="+overshoot.toFixed(2)+"°C");
+      converged=true;
+      break;
+    }
+  }
+  if(!converged){
+    const TI_final=SIM_STATE.TI, E_final=SP-TI_final;
+    const Iref_f=SIM_STATE.integral_ref||0;
+    console.log("  ❌ NÃO CONVERGIU em "+maxTick+" ticks | TI="+TI_final.toFixed(2)+"°C E="+E_final.toFixed(2)+"°C Iref="+Iref_f.toFixed(0));
+  }
+  console.log("");
+}
+
+// Executar todos os cenários
+testCenario("VERÃO",       38, 35,  2, 25, 100);
+testCenario("INVERNO",      8,  3,  5, 18,  60);
+testCenario("QUENTE_SECO", 34, 28,  3, 25,  80);
+testCenario("NOITE_QUENTE",30, 25,  3, 26,  30);
+testCenario("MANHÃ_PRIM",  22, 18,  4, 22,  15);
+testCenario("TEMPESTADE",  20, 15, 13, 20,  10);
+testCenario("NUBLADO_FRIO",12,  8,  6, 20,  80);
+testCenario("CALOR_VENTO", 32, 28, 10, 25,  60);
+</script>
+</body></html>

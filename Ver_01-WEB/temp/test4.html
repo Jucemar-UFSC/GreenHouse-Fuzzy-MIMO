@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test Modelo Normalizado</title></head>
+<body>
+<script>
+// MODELO BASEADO EM TAXA DE MUDANÇA PROPORCIONAL
+// dT = alpha*(T_target - TI)*pct_atuador/100
+// Onde T_target é o ponto de equilíbrio dos atuadores ativos
+
+const DT=30; // 30 segundos por tick
+
+function simNorm(TI, TE, VV, SP, b_pct, ex_pct, jl_pct, jsup, alm_pct, aq_n) {
+  // Componentes de mudança de temperatura por tick (°C)
+  
+  // 1. Condução natural: arrasta TI em direção a TE
+  //    Tau_cond = tempo de meia-vida (s) ~ 3600s (1h para equalizar com ext.)
+  const tau_cond = 4800; // 80min
+  const dT_cond  = (TE - TI) * DT / tau_cond;
+  
+  // 2. Solar: aquecimento constante baseado em TE
+  let Qsolar = TE >= 28 ? 0.15 : TE >= 20 ? 0.08 : TE >= 12 ? 0.03 : 0.0;
+  Qsolar *= (1 - (alm_pct/100) * 0.88);  // aluminet bloqueia
+  // Contribuição solar em °C/tick
+  const dT_solar = Qsolar * DT / 30;  // normalizado
+  
+  // 3. Ventilação: arrasta TI em direção a TE (mais rápido que condução)
+  //    Quanto mais abertura, mais rápido equaliza com TE
+  const vent_frac = (jl_pct/100) * 0.5 + (jsup ? 1 : 0) * 0.25 + (ex_pct/100) * 0.4;
+  const tau_vent  = 1200 / (1 + vent_frac * 3);  // varia entre 300s-1200s
+  const dT_vent   = (TE - TI) * DT / tau_vent;
+  
+  // 4. Resfriamento evaporativo: 
+  //    Quando bomba E exaustor ativos: arrasta TI em direção a T_pad
+  //    E adiciona P_super para ir abaixo de T_pad até SP
+  const HR=0.55, D=12, eff=0.88;
+  const Tbwb = TE - (1-HR)*D;
+  const Tpad = TE - eff*(TE-Tbwb);
+  
+  let dT_evap  = 0;
+  let dT_super = 0;
+  const bomba_f = b_pct/100, ex_f = ex_pct/100;
+  
+  if (bomba_f > 0.02 && ex_f > 0.02) {
+    // Resfriamento em direção a T_pad
+    const tau_evap = 900 / (bomba_f * ex_f);  // mais rápido com mais potência
+    dT_evap = (Tpad - TI) * DT / tau_evap;
+    
+    // Superresfriamento abaixo de T_pad (modelo ciclo compressão)
+    if (SP < Tpad) {
+      const gap = Math.min(10, Tpad - SP);  // quanto SP está abaixo do Tpad
+      const ativacao = Math.min(1, gap / 8) * bomba_f * ex_f;
+      // Taxa adicional: consegue abaixar 8°C em ~600 ticks com 100% dos atores
+      const tau_super = 600 / ativacao;
+      dT_super = (SP - TI) * DT / tau_super;
+    }
+  }
+  
+  // 5. Aquecimento
+  let dT_aq = 0;
+  if (aq_n > 0) {
+    // Cada aquecedor contribui para elevar TI em direção a T_max_aq
+    // T_max_aq = TE + 30*(aqN/4) °C (capacidade de aquecer 30°C acima de TE a plena potência)
+    const T_max_aq = TE + 30 * (aq_n / 4);
+    const tau_aq   = 1800 / (aq_n / 4);  // mais rápido com mais aquecedores
+    dT_aq = (T_max_aq - TI) * DT / tau_aq;
+  }
+  
+  const dT_total = dT_cond + dT_solar + dT_vent + dT_evap + dT_super + dT_aq;
+  const dT_sat   = Math.max(-8, Math.min(8, dT_total));
+  
+  return {
+    nTI: Math.max(-5, Math.min(65, TI + dT_sat)),
+    dT: dT_sat,
+    Tpad,
+    comps: {dT_cond, dT_solar, dT_vent, dT_evap, dT_super, dT_aq}
+  };
+}
+
+// VERÃO
+console.log("=== MODELO NORMALIZADO - VERÃO TI=38 TE=35 VV=2 SP=25 ===");
+let TI=38;
+const d0=simNorm(38,35,2,25,100,100,100,true,0,0);
+console.log("T0: Tpad="+d0.Tpad.toFixed(2)+" comps="+JSON.stringify(
+  Object.fromEntries(Object.entries(d0.comps).map(([k,v])=>[k,v.toFixed(4)]))));
+for(let t=1;t<=30;t++){
+  const r=simNorm(TI,35,2,25,100,100,100,true,0,0);
+  if(t<=8||Math.abs(25-TI)<2)console.log("T"+t+" TI="+TI.toFixed(3)+" dT="+r.dT.toFixed(3)+" E="+(25-TI).toFixed(3));
+  TI=r.nTI;
+  if(Math.abs(25-TI)<0.5){console.log("SETPOINT T"+t+" TI="+TI.toFixed(3));break;}
+}
+console.log("FINAL VERAO TI="+TI.toFixed(3));
+
+// INVERNO
+console.log("=== MODELO NORMALIZADO - INVERNO TI=8 TE=3 VV=5 SP=18 ===");
+let TI2=8;
+for(let t=1;t<=30;t++){
+  const r=simNorm(TI2,3,5,18,0,0,0,false,0,4);
+  if(t<=8||Math.abs(18-TI2)<2)console.log("T"+t+" TI="+TI2.toFixed(3)+" dT="+r.dT.toFixed(3)+" E="+(18-TI2).toFixed(3));
+  TI2=r.nTI;
+  if(Math.abs(18-TI2)<0.5){console.log("SETPOINT T"+t+" TI="+TI2.toFixed(3));break;}
+}
+console.log("FINAL INVERNO TI="+TI2.toFixed(3));
+</script>
+</body></html>

@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documento Técnico — Controlador Fuzzy Mamdani MIMO para Estufas</title>
+<style>
+  :root {
+    --primary:   #1a5c2a;
+    --accent:    #2e8b57;
+    --light:     #f0f7f2;
+    --text:      #1a1a1a;
+    --muted:     #555;
+    --border:    #cce0d4;
+    --code-bg:   #0d1117;
+    --code-fg:   #e6edf3;
+    --table-hd:  #2e8b57;
+    --warn:      #8b4513;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 12pt;
+    line-height: 1.8;
+    color: var(--text);
+    background: #fff;
+  }
+
+  /* ── IMPRESSÃO ────────────────────────────────────────────── */
+  @media print {
+    .no-print { display: none !important; }
+    body { font-size: 11pt; }
+    .page-break { page-break-before: always; }
+    .section-card { box-shadow: none !important; }
+  }
+
+  /* ── CAPA ─────────────────────────────────────────────────── */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0a2e14 0%, #1a5c2a 60%, #2e8b57 100%);
+    color: #fff;
+    text-align: center;
+    padding: 60px 40px;
+    page-break-after: always;
+  }
+  .cover .logo { font-size: 64px; margin-bottom: 20px; }
+  .cover .inst {
+    font-size: 13pt;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #a8d5b5;
+    margin-bottom: 40px;
+    font-family: Arial, sans-serif;
+  }
+  .cover h1 {
+    font-size: 28pt;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 16px;
+    line-height: 1.3;
+  }
+  .cover h2 {
+    font-size: 17pt;
+    color: #a8d5b5;
+    font-weight: normal;
+    margin-bottom: 40px;
+    font-style: italic;
+  }
+  .cover .meta {
+    margin-top: 50px;
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
+    color: #c8e6ce;
+    line-height: 2.2;
+  }
+  .cover .badge {
+    margin-top: 30px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 6px;
+    padding: 16px 40px;
+    font-family: Arial, sans-serif;
+    font-size: 10pt;
+    color: #d8f0de;
+  }
+
+  /* ── LAYOUT PRINCIPAL ─────────────────────────────────────── */
+  .doc-body {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 60px 48px;
+  }
+
+  /* ── SUMÁRIO ─────────────────────────────────────────────── */
+  .toc {
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--accent);
+    padding: 28px 36px;
+    border-radius: 4px;
+    margin-bottom: 60px;
+  }
+  .toc h3 {
+    font-size: 14pt;
+    color: var(--primary);
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .toc ol { padding-left: 24px; }
+  .toc li { margin: 6px 0; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 20px; margin-top: 4px; }
+  .toc .sub li { font-size: 11pt; color: var(--muted); }
+
+  /* ── SEÇÕES ──────────────────────────────────────────────── */
+  .section-card {
+    margin-bottom: 48px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .section-header {
+    background: var(--primary);
+    color: #fff;
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .section-header .sec-num {
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
+    background: rgba(255,255,255,0.2);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-weight: bold;
+  }
+  .section-header h2 {
+    font-size: 16pt;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+  }
+  .section-body {
+    padding: 32px 36px;
+    background: #fff;
+  }
+
+  /* ── TÍTULOS ─────────────────────────────────────────────── */
+  h3.sub-title {
+    font-size: 13pt;
+    color: var(--primary);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 6px;
+    margin: 28px 0 14px;
+  }
+  h4.micro-title {
+    font-size: 11pt;
+    color: var(--accent);
+    margin: 18px 0 8px;
+    font-family: Arial, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── PARÁGRAFOS ──────────────────────────────────────────── */
+  p { margin-bottom: 12px; text-align: justify; }
+  ul, ol { padding-left: 24px; margin-bottom: 12px; }
+  li { margin: 4px 0; }
+
+  /* ── EQUAÇÕES ────────────────────────────────────────────── */
+  .eq-block {
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    padding: 16px 24px;
+    margin: 20px 0;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 12pt;
+    overflow-x: auto;
+  }
+  .eq-label {
+    float: right;
+    color: var(--muted);
+    font-size: 10pt;
+    font-family: Arial, sans-serif;
+  }
+  .eq-title {
+    font-size: 10pt;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 4px;
+    font-family: Arial, sans-serif;
+  }
+
+  /* ── TABELAS ─────────────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 10.5pt;
+    font-family: Arial, sans-serif;
+  }
+  thead tr { background: var(--table-hd); color: #fff; }
+  thead th { padding: 10px 12px; text-align: left; font-weight: bold; }
+  tbody tr:nth-child(even) { background: var(--light); }
+  tbody tr:nth-child(odd)  { background: #fff; }
+  tbody td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:hover { background: #dff0e8; }
+  .center { text-align: center !important; }
+  .bold   { font-weight: bold; }
+  .mono   { font-family: 'Courier New', monospace; font-size: 10pt; }
+
+  /* ── DESTAQUES ───────────────────────────────────────────── */
+  .highlight-box {
+    background: #e8f5ee;
+    border: 1px solid #b2d8c4;
+    border-left: 5px solid var(--accent);
+    padding: 14px 20px;
+    margin: 16px 0;
+    border-radius: 4px;
+  }
+  .warn-box {
+    background: #fef9e7;
+    border: 1px solid #f5e17a;
+    border-left: 5px solid #d4a800;
+    padding: 14px 20px;
+    margin: 16px 0;
+    border-radius: 4px;
+  }
+  .info-box {
+    background: #e8f0fb;
+    border: 1px solid #b2c8f0;
+    border-left: 5px solid #3470c8;
+    padding: 14px 20px;
+    margin: 16px 0;
+    border-radius: 4px;
+  }
+
+  /* ── REGRAS ──────────────────────────────────────────────── */
+  .rule-group {
+    background: #f8fdf9;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin: 12px 0;
+    overflow: hidden;
+  }
+  .rule-group-header {
+    background: var(--accent);
+    color: #fff;
+    padding: 8px 16px;
+    font-family: Arial, sans-serif;
+    font-size: 10pt;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+  }
+  .rule-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0;
+    padding: 0;
+  }
+  .rule-item {
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    font-family: 'Courier New', monospace;
+    font-size: 9.5pt;
+  }
+  .rule-num { color: #888; margin-right: 6px; }
+  .rule-cond { color: #1a5c2a; font-weight: bold; }
+  .rule-out-ref { color: #c0392b; font-weight: bold; }
+  .rule-out-hea { color: #d35400; font-weight: bold; }
+  .rule-comment { color: #666; font-style: italic; font-size: 9pt; display: block; margin-top: 2px; }
+
+  /* ── DIAGRAMA ASCII ──────────────────────────────────────── */
+  .ascii-diagram {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 24px 28px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 10.5pt;
+    line-height: 1.6;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .ascii-diagram .highlight { color: #7dd3a8; }
+  .ascii-diagram .accent    { color: #ffcc66; }
+  .ascii-diagram .comment   { color: #6a9955; }
+
+  /* ── RESULTADOS ──────────────────────────────────────────── */
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .result-card {
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    text-align: center;
+  }
+  .result-card .val {
+    font-size: 20pt;
+    font-weight: bold;
+    color: var(--primary);
+    font-family: Arial, sans-serif;
+  }
+  .result-card .lbl {
+    font-size: 9pt;
+    color: var(--muted);
+    font-family: Arial, sans-serif;
+    margin-top: 4px;
+  }
+  .result-card.green .val { color: #2e8b57; }
+  .result-card.blue  .val { color: #2060a0; }
+  .result-card.orange .val { color: #c05000; }
+
+  /* ── BOTÃO IMPRESSÃO ─────────────────────────────────────── */
+  .btn-print {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 14px 22px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 13pt;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    font-family: Arial, sans-serif;
+    z-index: 999;
+    transition: background 0.2s;
+  }
+  .btn-print:hover { background: var(--accent); }
+
+  /* ── RODAPÉ ──────────────────────────────────────────────── */
+  footer {
+    background: var(--primary);
+    color: #a8d5b5;
+    text-align: center;
+    padding: 24px;
+    font-family: Arial, sans-serif;
+    font-size: 10pt;
+    margin-top: 60px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     CAPA
+     ══════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="logo">🌿</div>
+  <div class="inst">Universidade Federal de Santa Catarina — UFSC</div>
+  <h1>Controlador Fuzzy Mamdani MIMO<br>para Estufas Agrícolas</h1>
+  <h2>Sistema de Resfriamento Evaporativo Pad-and-Fan<br>com Ação Integral Anti-Offset</h2>
+  <div class="meta">
+    <strong>Autor:</strong> Jucemar Fernandes Costa &nbsp;|&nbsp; <strong>Orientação:</strong> UFSC<br>
+    <strong>Área:</strong> Engenharia de Controle e Automação &nbsp;|&nbsp; <strong>Nível:</strong> Dissertação de Mestrado<br>
+    <strong>Versão do Controlador:</strong> v4.0 (GreenHouse Fuzzy MIMO Simulator)<br>
+    <strong>Data:</strong> 2026
+  </div>
+  <div class="badge">
+    Documento Técnico de Apoio à Dissertação &nbsp;|&nbsp;
+    4 Entradas · 2 Saídas · 54 Regras Mamdani &nbsp;|&nbsp;
+    8 Cenários Validados — Convergência SP ±0.5°C
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     CORPO DO DOCUMENTO
+     ══════════════════════════════════════════════════════════ -->
+<div class="doc-body">
+
+<!-- ── SUMÁRIO ─────────────────────────────────────────────── -->
+<div class="toc">
+  <h3>📋 Sumário</h3>
+  <ol>
+    <li><a href="#sec1">Introdução e Motivação</a></li>
+    <li><a href="#sec2">Descrição Física da Estufa</a>
+      <ol class="sub">
+        <li><a href="#sec2a">Dimensões e Componentes</a></li>
+        <li><a href="#sec2b">Sistema Pad-and-Fan</a></li>
+        <li><a href="#sec2c">Atuadores Disponíveis</a></li>
+      </ol>
+    </li>
+    <li><a href="#sec3">Arquitetura do Controlador Fuzzy</a>
+      <ol class="sub">
+        <li><a href="#sec3a">Variáveis de Entrada</a></li>
+        <li><a href="#sec3b">Funções de Pertinência — Tabelas de Parâmetros</a></li>
+        <li><a href="#sec3c">Variáveis de Saída e Singletons</a></li>
+      </ol>
+    </li>
+    <li><a href="#sec4">Pipeline de Inferência Mamdani</a>
+      <ol class="sub">
+        <li><a href="#sec4a">Fuzzificação</a></li>
+        <li><a href="#sec4b">Avaliação das Regras (T-norm)</a></li>
+        <li><a href="#sec4c">Agregação</a></li>
+        <li><a href="#sec4d">Defuzzificação — Centróide de Singletons</a></li>
+        <li><a href="#sec4e">Anti-windup</a></li>
+      </ol>
+    </li>
+    <li><a href="#sec5">Base de Regras — 54 Regras com Justificativas</a></li>
+    <li><a href="#sec6">Mapeamento REF/HEA → Atuadores</a></li>
+    <li><a href="#sec7">Modelo Físico Térmico (7 Componentes)</a></li>
+    <li><a href="#sec8">Ação Integral PD+I (Anti-Offset)</a></li>
+    <li><a href="#sec9">Cenários de Validação</a></li>
+    <li><a href="#sec10">Resultados e Análise de Convergência</a></li>
+    <li><a href="#sec11">Comparação: Fuzzy vs Controle ON/OFF</a></li>
+    <li><a href="#sec12">Conclusões e Trabalhos Futuros</a></li>
+    <li><a href="#sec13">Referências</a></li>
+  </ol>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 1 — INTRODUÇÃO
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec1">
+  <div class="section-header">
+    <span class="sec-num">1</span>
+    <h2>Introdução e Motivação</h2>
+  </div>
+  <div class="section-body">
+    <p>O controle preciso de temperatura em estufas agrícolas é fundamental para a produtividade e qualidade das culturas. Sistemas tradicionais de controle ON/OFF apresentam limitações significativas: ciclos de histerese, overshoot térmico, consumo energético elevado e incapacidade de adaptação a diferentes condições climáticas externas.</p>
+
+    <p>Este trabalho propõe e valida um <strong>controlador fuzzy Mamdani MIMO</strong> (Multiple Input, Multiple Output) para regular a temperatura interna de uma estufa agrícola de médio porte (8×14×6 m), equipada com sistema de resfriamento evaporativo <em>pad-and-fan</em>, aquecedores elétricos e tela de sombreamento Aluminet.</p>
+
+    <div class="highlight-box">
+      <strong>Contribuição Principal:</strong> O controlador incorpora uma <strong>ação integral adaptativa</strong> que elimina o erro em estado estacionário causado pelo balanço entre ganho solar e capacidade de resfriamento — problema latente em controladores puramente proporcionais para ambientes com alta radiação solar.
+    </div>
+
+    <p>A validação abrange <strong>8 cenários climáticos</strong> distintos — de verão intenso (TE=38°C) a noite de inverno (TE=3°C) — com resultado de convergência ao setpoint em todos os casos, com erro máximo de ±0,5°C e <em>overshoot zero</em>.</p>
+
+    <h3 class="sub-title">Objetivos Específicos</h3>
+    <ul>
+      <li>Desenvolver uma base de conhecimento especialista com 54 regras Mamdani;</li>
+      <li>Implementar modelo físico térmico normalizado com 7 componentes de variação;</li>
+      <li>Resolver o problema de equilíbrio estacionário via ação integral sobre o aluminet;</li>
+      <li>Comparar desempenho fuzzy vs. controle ON/OFF em múltiplos cenários.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 2 — DESCRIÇÃO FÍSICA
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec2">
+  <div class="section-header">
+    <span class="sec-num">2</span>
+    <h2>Descrição Física da Estufa</h2>
+  </div>
+  <div class="section-body">
+
+    <h3 class="sub-title" id="sec2a">2.1 Dimensões e Componentes</h3>
+    <p>A estufa modelada possui as seguintes características físicas:</p>
+
+    <table>
+      <thead><tr><th>Parâmetro</th><th>Valor</th><th>Unidade</th><th>Observação</th></tr></thead>
+      <tbody>
+        <tr><td>Comprimento</td><td class="center bold">14</td><td>m</td><td>Eixo longitudinal</td></tr>
+        <tr><td>Largura</td><td class="center bold">8</td><td>m</td><td>Eixo transversal</td></tr>
+        <tr><td>Altura (cumeeira)</td><td class="center bold">6</td><td>m</td><td>Até o topo do arco</td></tr>
+        <tr><td>Volume interno</td><td class="center bold">672</td><td>m³</td><td>= 8×14×6</td></tr>
+        <tr><td>Massa de ar</td><td class="center bold">806</td><td>kg</td><td>ρ_ar = 1,2 kg/m³</td></tr>
+        <tr><td>Cobertura</td><td colspan="3">Polietileno transparente (transmissividade solar ~80%)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="ascii-diagram">
+<span class="comment">┌─────────────────────────────────────────────────────────────┐
+│                    ESTUFA — VISTA FRONTAL                    │
+├────────────────────────────────────────────────────────────┤</span>
+<span class="accent">        ╭─────── JANELAS SUPERIORES (cume) ───────╮         </span>
+<span class="highlight">      ╱  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ╲      </span>
+<span class="highlight">     ╱   ░░░░░░░░  ALUMINET (tela)  ░░░░░░░░   ╲     </span>
+<span class="comment">    │    ────────────────────────────────────    │    </span>
+<span class="comment">    │    │ Sensor TI │ Aquecedores (×4) │        │    </span>
+<span class="comment">    │    │           │                 │        │    </span>
+<span class="accent">  ══╪═══ JANELAS LATERAIS (H=1.8m) ══════════ ╪══  </span>
+<span class="highlight">    │ ██ PAD EVAP │─── ESTUFA 8×14×6m ───│ ██ │    </span>
+<span class="highlight">    │ ██ (parede) │                       │ ██ │    </span>
+<span class="accent">    └─╪────────────────────────────────────╪──┘    </span>
+<span class="comment">      ⊕ EXAUSTORES                  EXAUSTORES ⊕     </span>
+<span class="comment">      (2× 250W)          BOMBA 370W  (extração)       </span></div>
+
+    <h3 class="sub-title" id="sec2b">2.2 Sistema Pad-and-Fan (Resfriamento Evaporativo)</h3>
+    <p>O sistema <em>pad-and-fan</em> é o principal mecanismo de resfriamento. Consiste em:</p>
+    <ul>
+      <li><strong>Parede evaporativa (pad):</strong> material poroso (celulosa) saturado de água pela bomba;</li>
+      <li><strong>Exaustores:</strong> forçam o ar a atravessar o pad, gerando resfriamento por evaporação;</li>
+      <li><strong>Bomba d'água:</strong> 370 W, 250 L/h a 100%, mantém o pad úmido.</li>
+    </ul>
+
+    <p>A temperatura do ar após o pad (<em>T_pad</em>) é determinada pela temperatura de bulbo úmido:</p>
+
+    <div class="eq-block">
+      <span class="eq-label">(1)</span>
+      T<sub>BU</sub> = T<sub>E</sub> − (1 − HR) × 12
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(2)</span>
+      T<sub>pad</sub> = T<sub>E</sub> − η<sub>evap</sub> × (T<sub>E</sub> − T<sub>BU</sub>)
+    </div>
+    <p class="eq-title">onde HR = 0,55 (umidade relativa típica) e η<sub>evap</sub> = 0,88 (eficiência do pad)</p>
+
+    <div class="info-box">
+      <strong>Exemplo:</strong> TE = 35°C, HR = 55% → T<sub>BU</sub> = 35 − 5,4 = 29,6°C → T<sub>pad</sub> = 35 − 0,88×(35−29,6) = <strong>30,2°C</strong><br>
+      Com TE = 28°C → T<sub>pad</sub> = <strong>23,2°C</strong> (abaixo de SP=25°C — Caso B)
+    </div>
+
+    <h3 class="sub-title" id="sec2c">2.3 Atuadores Disponíveis</h3>
+    <table>
+      <thead><tr><th>Atuador</th><th>Tipo</th><th>Potência</th><th>Função</th><th>Controle</th></tr></thead>
+      <tbody>
+        <tr><td>Bomba d'água</td><td>Elétrico</td><td>370 W</td><td>Saturar o pad evaporativo</td><td>Tempo-proporcional (0–100%)</td></tr>
+        <tr><td>Exaustores (×2)</td><td>Ventilador</td><td>2×250 W</td><td>Forçar ar pelo pad</td><td>Tempo-proporcional (0–100%)</td></tr>
+        <tr><td>Aquecedores (×4)</td><td>Resistência</td><td>4×1500 W</td><td>Elevar temperatura</td><td>Estágios 0, 1, 2, 3, 4</td></tr>
+        <tr><td>Janelas laterais</td><td>Motor</td><td>60 W</td><td>Ventilação natural</td><td>0%, 33%, 66%, 100%</td></tr>
+        <tr><td>Janelas superiores</td><td>Motor</td><td>60 W</td><td>Convecção natural (cume)</td><td>Binário (aberta/fechada)</td></tr>
+        <tr><td>Aluminet</td><td>Motor</td><td>120 W</td><td>Bloquear radiação solar</td><td>Proporcional 0–100%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 3 — ARQUITETURA DO CONTROLADOR
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec3">
+  <div class="section-header">
+    <span class="sec-num">3</span>
+    <h2>Arquitetura do Controlador Fuzzy</h2>
+  </div>
+  <div class="section-body">
+
+    <p>O controlador é do tipo <strong>Mamdani MIMO</strong> com 4 variáveis de entrada, 2 variáveis de saída e 54 regras linguísticas. A inferência utiliza a t-norma mínimo (produto mínimo) e a defuzzificação por centróide de singletons.</p>
+
+    <div class="ascii-diagram">
+<span class="comment">╔══════════════════ ARQUITETURA MAMDANI MIMO ══════════════════╗
+║                                                              ║</span>
+<span class="highlight">║   ENTRADAS              MOTOR FUZZY            SAÍDAS        ║</span>
+<span class="comment">║   ───────               ─────────────          ──────        ║
+║                                                              ║</span>
+<span class="accent">║   TI (°C) ──┐           ┌─────────────┐    ┌─▶ REF (0-100%)║</span>
+<span class="accent">║   SP (°C) ──┤ E=SP-TI──▶│ Fuzzif.     │    │               ║</span>
+<span class="accent">║             │ dE ──────▶│ 54 Regras  │────┤               ║</span>
+<span class="accent">║   TE (°C) ──┤ ─────────▶│ Inferência  │    │               ║</span>
+<span class="accent">║   VV(m/s) ──┘ ─────────▶│ Defuzzif.   │    └─▶ HEA (0-100%)║</span>
+<span class="comment">║                          └─────────────┘                     ║
+║                                 │                            ║
+║                    Anti-windup ─┘                            ║
+║                    Zona morta ±0.3°C                         ║</span>
+<span class="comment">╚══════════════════════════════════════════════════════════════╝</span></div>
+
+    <h3 class="sub-title" id="sec3a">3.1 Variáveis de Entrada</h3>
+    <table>
+      <thead><tr><th>Variável</th><th>Símbolo</th><th>Universo</th><th>Termos Linguísticos</th><th>Definição</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Erro de temperatura</td>
+          <td class="mono center">E</td>
+          <td class="center">[−25, +25] °C</td>
+          <td>MN, N, Z, P, MP</td>
+          <td>E = SP − TI (positivo: frio; negativo: quente)</td>
+        </tr>
+        <tr>
+          <td>Derivada do erro</td>
+          <td class="mono center">dE</td>
+          <td class="center">[−8, +8] °C/tick</td>
+          <td>N, Z, P</td>
+          <td>dE = E(k) − E(k−1)</td>
+        </tr>
+        <tr>
+          <td>Temperatura externa</td>
+          <td class="mono center">TE</td>
+          <td class="center">[−10, +55] °C</td>
+          <td>Fria, Amena, Quente</td>
+          <td>Condição climática externa</td>
+        </tr>
+        <tr>
+          <td>Velocidade do vento</td>
+          <td class="mono center">VV</td>
+          <td class="center">[0, +20] m/s</td>
+          <td>Fraco, Medio, Forte</td>
+          <td>Vento externo medido por anemômetro</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title" id="sec3b">3.2 Funções de Pertinência — Parâmetros Completos</h3>
+
+    <h4 class="micro-title">E — Erro de Temperatura [−25, +25] °C</h4>
+    <table>
+      <thead><tr><th>Termo</th><th>Tipo</th><th>a</th><th>b</th><th>c</th><th>d</th><th>Semântica</th></tr></thead>
+      <tbody>
+        <tr><td class="bold">MN</td><td>trapmf</td><td class="center">−30</td><td class="center">−25</td><td class="center">−8</td><td class="center">−4</td><td>TI muito acima do SP → resfriamento máximo</td></tr>
+        <tr><td class="bold">N</td><td>trimf</td><td class="center">−8</td><td class="center">−4</td><td class="center">−0,5</td><td class="center">—</td><td>TI acima do SP → resfriamento moderado</td></tr>
+        <tr><td class="bold">Z</td><td>trimf</td><td class="center">−1,5</td><td class="center">0</td><td class="center">1,5</td><td class="center">—</td><td>TI próxima do SP → manutenção</td></tr>
+        <tr><td class="bold">P</td><td>trimf</td><td class="center">0,5</td><td class="center">4</td><td class="center">8</td><td class="center">—</td><td>TI abaixo do SP → aquecimento moderado</td></tr>
+        <tr><td class="bold">MP</td><td>trapmf</td><td class="center">4</td><td class="center">8</td><td class="center">25</td><td class="center">30</td><td>TI muito abaixo do SP → aquecimento máximo</td></tr>
+      </tbody>
+    </table>
+
+    <h4 class="micro-title">dE — Derivada do Erro [−8, +8] °C/tick</h4>
+    <table>
+      <thead><tr><th>Termo</th><th>Tipo</th><th>a</th><th>b</th><th>c</th><th>d</th><th>Semântica</th></tr></thead>
+      <tbody>
+        <tr><td class="bold">N</td><td>trapmf</td><td class="center">−8</td><td class="center">−4</td><td class="center">−0,8</td><td class="center">−0,1</td><td>Erro diminuindo (melhoria)</td></tr>
+        <tr><td class="bold">Z</td><td>trimf</td><td class="center">−0,5</td><td class="center">0</td><td class="center">0,5</td><td class="center">—</td><td>Erro estável</td></tr>
+        <tr><td class="bold">P</td><td>trapmf</td><td class="center">0,1</td><td class="center">0,8</td><td class="center">4</td><td class="center">8</td><td>Erro aumentando (piora)</td></tr>
+      </tbody>
+    </table>
+
+    <h4 class="micro-title">TE — Temperatura Externa [−10, +55] °C</h4>
+    <table>
+      <thead><tr><th>Termo</th><th>Tipo</th><th>a</th><th>b</th><th>c</th><th>d</th><th>Semântica</th></tr></thead>
+      <tbody>
+        <tr><td class="bold">Fria</td><td>trapmf</td><td class="center">−10</td><td class="center">−5</td><td class="center">8</td><td class="center">16</td><td>Inverno, noite</td></tr>
+        <tr><td class="bold">Amena</td><td>trimf</td><td class="center">12</td><td class="center">20</td><td class="center">28</td><td class="center">—</td><td>Primavera, outono</td></tr>
+        <tr><td class="bold">Quente</td><td>trapmf</td><td class="center">24</td><td class="center">30</td><td class="center">45</td><td class="center">55</td><td>Verão, calor intenso</td></tr>
+      </tbody>
+    </table>
+
+    <h4 class="micro-title">VV — Velocidade do Vento [0, +20] m/s</h4>
+    <table>
+      <thead><tr><th>Termo</th><th>Tipo</th><th>a</th><th>b</th><th>c</th><th>d</th><th>Semântica</th></tr></thead>
+      <tbody>
+        <tr><td class="bold">Fraco</td><td>trapmf</td><td class="center">−1</td><td class="center">0</td><td class="center">3</td><td class="center">6</td><td>Sem vento / brisa</td></tr>
+        <tr><td class="bold">Medio</td><td>trimf</td><td class="center">4</td><td class="center">7</td><td class="center">11</td><td class="center">—</td><td>Vento moderado, favorece ventilação</td></tr>
+        <tr><td class="bold">Forte</td><td>trapmf</td><td class="center">9</td><td class="center">12</td><td class="center">15</td><td class="center">20</td><td>Risco de danos — fechar janelas</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title" id="sec3c">3.3 Variáveis de Saída — Singletons</h3>
+    <p>As saídas utilizam representação por <strong>singletons</strong> (valores discretos), adequada para Mamdani com centróide. Os cinco níveis representam intensidades crescentes dos atuadores:</p>
+
+    <table>
+      <thead><tr><th>Singleton</th><th>Valor (%)</th><th>Descrição</th><th>Atuadores típicos</th></tr></thead>
+      <tbody>
+        <tr><td class="bold">OFF</td><td class="center">0</td><td>Desligado</td><td>Todos desligados</td></tr>
+        <tr><td class="bold">LEVE</td><td class="center">20</td><td>Ativação suave</td><td>Janelas 22%, bomba off</td></tr>
+        <tr><td class="bold">MEDIO</td><td class="center">40</td><td>Ativação média</td><td>Janelas 44%, bomba 37,5%</td></tr>
+        <tr><td class="bold">ALTO</td><td class="center">65</td><td>Ativação alta</td><td>Janelas 71%, bomba 68%, aluminet 87%</td></tr>
+        <tr><td class="bold">MAX</td><td class="center">90</td><td>Potência máxima</td><td>Janelas 99%, bomba 100%, aluminet 100%</td></tr>
+      </tbody>
+    </table>
+
+    <table>
+      <thead><tr><th>Variável de Saída</th><th>Símbolo</th><th>Universo</th><th>Condição de Ativação</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Potência de resfriamento</td>
+          <td class="mono center">REF</td>
+          <td class="center">[0, 100] %</td>
+          <td>E &lt; −0,3°C (TI &gt; SP)</td>
+        </tr>
+        <tr>
+          <td>Potência de aquecimento</td>
+          <td class="mono center">HEA</td>
+          <td class="center">[0, 100] %</td>
+          <td>E &gt; +0,3°C (TI &lt; SP)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 4 — PIPELINE DE INFERÊNCIA
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec4">
+  <div class="section-header">
+    <span class="sec-num">4</span>
+    <h2>Pipeline de Inferência Mamdani</h2>
+  </div>
+  <div class="section-body">
+
+    <h3 class="sub-title" id="sec4a">4.1 Etapa 1 — Fuzzificação</h3>
+    <p>Para cada variável de entrada, calcula-se o grau de pertinência em cada conjunto fuzzy. O grau é limitado ao intervalo [0, 1]:</p>
+
+    <div class="eq-block">
+      <span class="eq-label">(3)</span>
+      μ_E(E) = {μ_MN(E), μ_N(E), μ_Z(E), μ_P(E), μ_MP(E)}
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(4)</span>
+      μ_dE(dE) = {μ_N(dE), μ_Z(dE), μ_P(dE)}
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(5)</span>
+      μ_TE(TE) = {μ_Fria(TE), μ_Amena(TE), μ_Quente(TE)}
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(6)</span>
+      μ_VV(VV) = {μ_Fraco(VV), μ_Medio(VV), μ_Forte(VV)}
+    </div>
+
+    <h3 class="sub-title" id="sec4b">4.2 Etapa 2 — Avaliação das Regras (T-norm Mínimo)</h3>
+    <p>Para cada regra <em>i</em> com antecedente (E<sub>k</sub>, dE<sub>k</sub>, TE<sub>k</sub>, VV<sub>k</sub>), a força de ativação α<sub>i</sub> é calculada pela t-norma mínimo:</p>
+
+    <div class="eq-block">
+      <span class="eq-label">(7)</span>
+      α<sub>i</sub> = min(μ_E(E<sub>k</sub>), μ_dE(dE<sub>k</sub>), μ_TE(TE<sub>k</sub>), μ_VV(VV<sub>k</sub>))
+    </div>
+    <p>Quando VV<sub>k</sub> = '*' (qualquer vento): μ_VV = 1,0</p>
+    <p>Regras com α<sub>i</sub> &lt; 0,005 são descartadas (limiar de ativação).</p>
+
+    <h3 class="sub-title" id="sec4c">4.3 Etapa 3 — Agregação</h3>
+    <p>As saídas de cada regra são agregadas por soma ponderada dos singletons:</p>
+
+    <div class="eq-block">
+      <span class="eq-label">(8)</span>
+      Σ_REF_num = Σ<sub>i=1..54</sub> (REF_i × α_i)  ;  Σ_REF_den = Σ<sub>i=1..54</sub> α_i
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(9)</span>
+      Σ_HEA_num = Σ<sub>i=1..54</sub> (HEA_i × α_i)  ;  Σ_HEA_den = Σ<sub>i=1..54</sub> α_i
+    </div>
+
+    <h3 class="sub-title" id="sec4d">4.4 Etapa 4 — Defuzzificação (Centróide de Singletons)</h3>
+    <div class="eq-block">
+      <span class="eq-label">(10)</span>
+      REF* = Σ_REF_num / Σ_REF_den  (se Σ_REF_den &gt; 0)
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(11)</span>
+      HEA* = Σ_HEA_num / Σ_HEA_den  (se Σ_HEA_den &gt; 0)
+    </div>
+    <p>Este método equivale ao centróide clássico aplicado a funções de saída impulsivas (Sugeno de ordem zero), com a vantagem de eficiência computacional preservando a semântica Mamdani.</p>
+
+    <h3 class="sub-title" id="sec4e">4.5 Etapa 5 — Anti-windup (Zona Morta ±0,3°C)</h3>
+    <div class="eq-block">
+      <span class="eq-label">(12)</span>
+      SE E &lt; −0,3°C → REF = REF*,  HEA = 0    (resfriamento apenas)
+      SE E &gt; +0,3°C → REF = 0,    HEA = HEA*  (aquecimento apenas)
+      SE |E| ≤ 0,3°C → REF = 0,    HEA = 0    (zona morta — desliga)
+    </div>
+    <p>A zona morta de ±0,3°C previne chaveamento frequente quando TI ≈ SP e evita ativação simultânea de resfriamento e aquecimento (conflito de saídas).</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 5 — BASE DE REGRAS
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec5">
+  <div class="section-header">
+    <span class="sec-num">5</span>
+    <h2>Base de Regras — 54 Regras com Justificativas</h2>
+  </div>
+  <div class="section-body">
+
+    <p>As 54 regras foram definidas com base em conhecimento especialista sobre o comportamento térmico de estufas. Estão organizadas em 5 grupos por valor linguístico do erro E.</p>
+
+    <!-- GRUPO 1 -->
+    <div class="rule-group">
+      <div class="rule-group-header">🔴 GRUPO 1 — SUPERAQUECIMENTO: E = MN (TI muito acima do SP) | R01–R16</div>
+      <div style="padding:14px;background:#fff8f8;font-size:10.5pt">
+        <strong>Justificativa:</strong> Quando TI está muito acima do setpoint (E muito negativo), o sistema requer ação de resfriamento máxima. A intensidade é reduzida quando: (a) a TE é fria (ajuda natural); (b) o vento é forte (fechar janelas por segurança); ou (c) o dE indica que o sistema já está se recuperando.
+      </div>
+      <div class="rule-grid">
+        <div class="rule-item"><span class="rule-num">R01</span><span class="rule-cond">E=MN, dE=N, TE=Quente, VV=Fraco</span> → <span class="rule-out-ref">REF=MAX</span><span class="rule-comment">Piora+calor+sem vento: máximo esforço</span></div>
+        <div class="rule-item"><span class="rule-num">R02</span><span class="rule-cond">E=MN, dE=N, TE=Quente, VV=Medio</span> → <span class="rule-out-ref">REF=MAX</span><span class="rule-comment">Vento médio ajuda, manter MAX</span></div>
+        <div class="rule-item"><span class="rule-num">R03</span><span class="rule-cond">E=MN, dE=N, TE=Quente, VV=Forte</span> → <span class="rule-out-ref">REF=ALTO</span><span class="rule-comment">Vento forte: fechar janelas → ALTO</span></div>
+        <div class="rule-item"><span class="rule-num">R04</span><span class="rule-cond">E=MN, dE=Z, TE=Quente, VV=Fraco</span> → <span class="rule-out-ref">REF=MAX</span><span class="rule-comment">Estável+calor: MAX</span></div>
+        <div class="rule-item"><span class="rule-num">R05</span><span class="rule-cond">E=MN, dE=Z, TE=Quente, VV=Medio</span> → <span class="rule-out-ref">REF=MAX</span><span class="rule-comment">Vento médio+estável: MAX</span></div>
+        <div class="rule-item"><span class="rule-num">R06</span><span class="rule-cond">E=MN, dE=P, TE=Quente, VV=Fraco</span> → <span class="rule-out-ref">REF=MAX</span><span class="rule-comment">Melhorando mas TI>>SP: manter MAX</span></div>
+        <div class="rule-item"><span class="rule-num">R07</span><span class="rule-cond">E=MN, dE=P, TE=Quente, VV=Medio</span> → <span class="rule-out-ref">REF=ALTO</span><span class="rule-comment">Recuperação+vento médio: ALTO</span></div>
+        <div class="rule-item"><span class="rule-num">R08</span><span class="rule-cond">E=MN, dE=N, TE=Amena, VV=Fraco</span> → <span class="rule-out-ref">REF=MAX</span><span class="rule-comment">TE amena mas TI muito alta: MAX</span></div>
+        <div class="rule-item"><span class="rule-num">R09</span><span class="rule-cond">E=MN, dE=N, TE=Amena, VV=Medio</span> → <span class="rule-out-ref">REF=ALTO</span><span class="rule-comment">Vento auxilia: ALTO suficiente</span></div>
+        <div class="rule-item"><span class="rule-num">R10</span><span class="rule-cond">E=MN, dE=Z, TE=Amena, VV=Fraco</span> → <span class="rule-out-ref">REF=MAX</span><span class="rule-comment">Estável+amena: MAX</span></div>
+        <div class="rule-item"><span class="rule-num">R11</span><span class="rule-cond">E=MN, dE=Z, TE=Amena, VV=Medio</span> → <span class="rule-out-ref">REF=ALTO</span><span class="rule-comment">Vento+estável: ALTO</span></div>
+        <div class="rule-item"><span class="rule-num">R12</span><span class="rule-cond">E=MN, dE=P, TE=Amena, VV=Fraco</span> → <span class="rule-out-ref">REF=ALTO</span><span class="rule-comment">Recuperando+TE amena: ALTO</span></div>
+        <div class="rule-item"><span class="rule-num">R13</span><span class="rule-cond">E=MN, dE=P, TE=Amena, VV=Medio</span> → <span class="rule-out-ref">REF=MEDIO</span><span class="rule-comment">Boa recuperação: MEDIO</span></div>
+        <div class="rule-item"><span class="rule-num">R14</span><span class="rule-cond">E=MN, dE=N, TE=Fria, VV=Fraco</span> → <span class="rule-out-ref">REF=ALTO</span><span class="rule-comment">TE fria ajuda naturalmente: ALTO</span></div>
+        <div class="rule-item"><span class="rule-num">R15</span><span class="rule-cond">E=MN, dE=Z, TE=Fria, VV=Fraco</span> → <span class="rule-out-ref">REF=MEDIO</span><span class="rule-comment">TE fria+estável: MEDIO basta</span></div>
+        <div class="rule-item"><span class="rule-num">R16</span><span class="rule-cond">E=MN, dE=P, TE=Fria, VV=Fraco</span> → <span class="rule-out-ref">REF=LEVE</span><span class="rule-comment">TE fria+recuperando: LEVE</span></div>
+      </div>
+    </div>
+
+    <!-- GRUPO 2 -->
+    <div class="rule-group">
+      <div class="rule-group-header">🟠 GRUPO 2 — TEMPERATURA ELEVADA: E = N (TI pouco acima do SP) | R17–R28</div>
+      <div style="padding:14px;background:#fff8f0;font-size:10.5pt">
+        <strong>Justificativa:</strong> Erro moderado. Mesmo com dE positivo (sistema esfriando), mantém-se REF alto para superar ganho solar contínuo e garantir convergência ao SP sem criar novo equilíbrio. A redução de REF ocorre apenas com vento moderado ou TE fria.
+      </div>
+      <div class="rule-grid">
+        <div class="rule-item"><span class="rule-num">R17</span><span class="rule-cond">E=N, dE=N, TE=Quente, VV=Fraco</span> → <span class="rule-out-ref">REF=ALTO</span><span class="rule-comment">TI cai+TE quente: ALTO para superar solar</span></div>
+        <div class="rule-item"><span class="rule-num">R18</span><span class="rule-cond">E=N, dE=N, TE=Quente, VV=Medio</span> → <span class="rule-out-ref">REF=MEDIO</span><span class="rule-comment">Vento ajuda: MEDIO suficiente</span></div>
+        <div class="rule-item"><span class="rule-num">R19</span><span class="rule-cond">E=N, dE=Z, TE=Quente, VV=Fraco</span> → <span class="rule-out-ref">REF=ALTO</span><span class="rule-comment">Estável+calor: ALTO</span></div>
+        <div class="rule-item"><span class="rule-num">R20</span><span class="rule-cond">E=N, dE=Z, TE=Quente, VV=Medio</span> → <span class="rule-out-ref">REF=ALTO</span><span class="rule-comment">ALTO para superar solar mesmo com vento</span></div>
+        <div class="rule-item"><span class="rule-num">R21</span><span class="rule-cond">E=N, dE=P, TE=Quente, VV=Fraco</span> → <span class="rule-out-ref">REF=ALTO</span><span class="rule-comment">Esfriando mas TE quente: ALTO</span></div>
+        <div class="rule-item"><span class="rule-num">R22</span><span class="rule-cond">E=N, dE=P, TE=Quente, VV=Medio</span> → <span class="rule-out-ref">REF=MEDIO</span><span class="rule-comment">Com vento: MEDIO OK</span></div>
+        <div class="rule-item"><span class="rule-num">R23</span><span class="rule-cond">E=N, dE=N, TE=Amena, VV=Fraco</span> → <span class="rule-out-ref">REF=MEDIO</span><span class="rule-comment">TE amena: MEDIO</span></div>
+        <div class="rule-item"><span class="rule-num">R24</span><span class="rule-cond">E=N, dE=Z, TE=Amena, VV=Fraco</span> → <span class="rule-out-ref">REF=MEDIO</span><span class="rule-comment">TE amena+estável: MEDIO</span></div>
+        <div class="rule-item"><span class="rule-num">R25</span><span class="rule-cond">E=N, dE=P, TE=Amena, VV=Fraco</span> → <span class="rule-out-ref">REF=MEDIO</span><span class="rule-comment">MEDIO para garantir convergência</span></div>
+        <div class="rule-item"><span class="rule-num">R26</span><span class="rule-cond">E=N, dE=N, TE=Fria, VV=Fraco</span> → <span class="rule-out-ref">REF=LEVE</span><span class="rule-comment">TE fria ajuda: LEVE suficiente</span></div>
+        <div class="rule-item"><span class="rule-num">R27</span><span class="rule-cond">E=N, dE=Z, TE=Fria, VV=Fraco</span> → <span class="rule-out-ref">REF=LEVE</span><span class="rule-comment">TE fria+estável: LEVE</span></div>
+        <div class="rule-item"><span class="rule-num">R28</span><span class="rule-cond">E=N, dE=P, TE=Fria, VV=Fraco</span> → <span class="rule-out-ref">REF=OFF</span><span class="rule-comment">Esfriando naturalmente: OFF</span></div>
+      </div>
+    </div>
+
+    <!-- GRUPO 3 -->
+    <div class="rule-group">
+      <div class="rule-group-header">🟢 GRUPO 3 — EQUILÍBRIO: E = Z (TI ≈ SP ±1,5°C) | R29–R37</div>
+      <div style="padding:14px;background:#f0fff4;font-size:10.5pt">
+        <strong>Justificativa:</strong> Sistema no setpoint. Com TE quente, manter refrigeração LEVE para compensar ganho solar contínuo. Com TE amena ou fria, iniciar aquecimento ou desligar. O '*' em VV indica que a velocidade não é relevante quando E≈0.
+      </div>
+      <div class="rule-grid">
+        <div class="rule-item"><span class="rule-num">R29</span><span class="rule-cond">E=Z, dE=N, TE=Quente, VV=*</span> → <span class="rule-out-ref">REF=LEVE</span><span class="rule-comment">Esfriando+TE quente: LEVE refrig</span></div>
+        <div class="rule-item"><span class="rule-num">R30</span><span class="rule-cond">E=Z, dE=Z, TE=Quente, VV=*</span> → <span class="rule-out-ref">REF=LEVE</span><span class="rule-comment">Estável+TE quente: LEVE compensa solar</span></div>
+        <div class="rule-item"><span class="rule-num">R31</span><span class="rule-cond">E=Z, dE=P, TE=Quente, VV=*</span> → <span class="rule-out-ref">REF=OFF</span><span class="rule-comment">Aquecendo leve: aguardar próximo tick</span></div>
+        <div class="rule-item"><span class="rule-num">R32</span><span class="rule-cond">E=Z, dE=N, TE=Amena, VV=*</span> → <span class="rule-out-ref">REF=OFF</span><span class="rule-comment">Esfriando+TE amena: OFF</span></div>
+        <div class="rule-item"><span class="rule-num">R33</span><span class="rule-cond">E=Z, dE=Z, TE=Amena, VV=*</span> → OFF/OFF<span class="rule-comment">✅ SETPOINT ATINGIDO — EQUILÍBRIO</span></div>
+        <div class="rule-item"><span class="rule-num">R34</span><span class="rule-cond">E=Z, dE=P, TE=Amena, VV=*</span> → <span class="rule-out-hea">HEA=LEVE</span><span class="rule-comment">Aquecendo leve+TE amena: HEA LEVE</span></div>
+        <div class="rule-item"><span class="rule-num">R35</span><span class="rule-cond">E=Z, dE=N, TE=Fria, VV=*</span> → OFF/OFF<span class="rule-comment">Esfriando+fria: OFF</span></div>
+        <div class="rule-item"><span class="rule-num">R36</span><span class="rule-cond">E=Z, dE=Z, TE=Fria, VV=*</span> → <span class="rule-out-hea">HEA=LEVE</span><span class="rule-comment">Estável+TE fria: aquecimento suave</span></div>
+        <div class="rule-item"><span class="rule-num">R37</span><span class="rule-cond">E=Z, dE=P, TE=Fria, VV=*</span> → <span class="rule-out-hea">HEA=MEDIO</span><span class="rule-comment">Piora+TE fria: mais aquecimento</span></div>
+      </div>
+    </div>
+
+    <!-- GRUPO 4 -->
+    <div class="rule-group">
+      <div class="rule-group-header">🔵 GRUPO 4 — TEMPERATURA BAIXA: E = P (TI pouco abaixo do SP) | R38–R45</div>
+      <div style="padding:14px;background:#f0f4ff;font-size:10.5pt">
+        <strong>Justificativa:</strong> TI abaixo do setpoint. Aquecimento proporcional à TE e dE. Com TE fria e piora (dE=P), máximo esforço. Com TE quente, a condução natural contribui; menos energia necessária.
+      </div>
+      <div class="rule-grid">
+        <div class="rule-item"><span class="rule-num">R38</span><span class="rule-cond">E=P, dE=P, TE=Fria, VV=*</span> → <span class="rule-out-hea">HEA=ALTO</span><span class="rule-comment">TI baixa+fria+piorando: ALTO</span></div>
+        <div class="rule-item"><span class="rule-num">R39</span><span class="rule-cond">E=P, dE=Z, TE=Fria, VV=*</span> → <span class="rule-out-hea">HEA=MEDIO</span><span class="rule-comment">TI baixa+fria+estável: MEDIO</span></div>
+        <div class="rule-item"><span class="rule-num">R40</span><span class="rule-cond">E=P, dE=N, TE=Fria, VV=*</span> → <span class="rule-out-hea">HEA=LEVE</span><span class="rule-comment">Melhorando+fria: LEVE</span></div>
+        <div class="rule-item"><span class="rule-num">R41</span><span class="rule-cond">E=P, dE=P, TE=Amena, VV=*</span> → <span class="rule-out-hea">HEA=MEDIO</span><span class="rule-comment">TI baixa+amena+piora: MEDIO</span></div>
+        <div class="rule-item"><span class="rule-num">R42</span><span class="rule-cond">E=P, dE=Z, TE=Amena, VV=*</span> → <span class="rule-out-hea">HEA=LEVE</span><span class="rule-comment">TI baixa+amena+estável: LEVE</span></div>
+        <div class="rule-item"><span class="rule-num">R43</span><span class="rule-cond">E=P, dE=N, TE=Amena, VV=*</span> → OFF/OFF<span class="rule-comment">Melhorando+amena: OFF</span></div>
+        <div class="rule-item"><span class="rule-num">R44</span><span class="rule-cond">E=P, dE=P, TE=Quente, VV=*</span> → <span class="rule-out-hea">HEA=LEVE</span><span class="rule-comment">TE quente contribui: LEVE</span></div>
+        <div class="rule-item"><span class="rule-num">R45</span><span class="rule-cond">E=P, dE=Z, TE=Quente, VV=*</span> → OFF/OFF<span class="rule-comment">TE quente aquece naturalmente</span></div>
+      </div>
+    </div>
+
+    <!-- GRUPO 5 -->
+    <div class="rule-group">
+      <div class="rule-group-header">❄️ GRUPO 5 — SUB-RESFRIAMENTO: E = MP (TI muito abaixo do SP) | R46–R54</div>
+      <div style="padding:14px;background:#f0f8ff;font-size:10.5pt">
+        <strong>Justificativa:</strong> TI muito abaixo do setpoint — risco de dano às plantas por geada ou baixa temperatura. Aquecimento máximo necessário. Com TE quente, a natureza já contribui; menos energia.
+      </div>
+      <div class="rule-grid">
+        <div class="rule-item"><span class="rule-num">R46</span><span class="rule-cond">E=MP, dE=P, TE=Fria, VV=*</span> → <span class="rule-out-hea">HEA=MAX</span><span class="rule-comment">TI mto baixa+fria+piora: MAX</span></div>
+        <div class="rule-item"><span class="rule-num">R47</span><span class="rule-cond">E=MP, dE=Z, TE=Fria, VV=*</span> → <span class="rule-out-hea">HEA=MAX</span><span class="rule-comment">TI mto baixa+fria+estável: MAX</span></div>
+        <div class="rule-item"><span class="rule-num">R48</span><span class="rule-cond">E=MP, dE=N, TE=Fria, VV=*</span> → <span class="rule-out-hea">HEA=ALTO</span><span class="rule-comment">Melhorando: ALTO basta</span></div>
+        <div class="rule-item"><span class="rule-num">R49</span><span class="rule-cond">E=MP, dE=P, TE=Amena, VV=*</span> → <span class="rule-out-hea">HEA=ALTO</span><span class="rule-comment">Mto baixa+amena+piora: ALTO</span></div>
+        <div class="rule-item"><span class="rule-num">R50</span><span class="rule-cond">E=MP, dE=Z, TE=Amena, VV=*</span> → <span class="rule-out-hea">HEA=MEDIO</span><span class="rule-comment">Mto baixa+amena: MEDIO</span></div>
+        <div class="rule-item"><span class="rule-num">R51</span><span class="rule-cond">E=MP, dE=N, TE=Amena, VV=*</span> → <span class="rule-out-hea">HEA=LEVE</span><span class="rule-comment">Recuperando rapidamente: LEVE</span></div>
+        <div class="rule-item"><span class="rule-num">R52</span><span class="rule-cond">E=MP, dE=P, TE=Quente, VV=*</span> → <span class="rule-out-hea">HEA=MEDIO</span><span class="rule-comment">TE quente contribui: MEDIO</span></div>
+        <div class="rule-item"><span class="rule-num">R53</span><span class="rule-cond">E=MP, dE=Z, TE=Quente, VV=*</span> → <span class="rule-out-hea">HEA=LEVE</span><span class="rule-comment">TE quente+estável: LEVE</span></div>
+        <div class="rule-item"><span class="rule-num">R54</span><span class="rule-cond">E=MP, dE=N, TE=Quente, VV=*</span> → OFF/OFF<span class="rule-comment">TE quente aquece naturalmente: OFF</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 6 — MAPEAMENTO ATUADORES
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec6">
+  <div class="section-header">
+    <span class="sec-num">6</span>
+    <h2>Mapeamento REF/HEA → Atuadores</h2>
+  </div>
+  <div class="section-body">
+
+    <h3 class="sub-title">6.1 REF (0–100%) → Atuadores de Resfriamento</h3>
+    <p>A ativação dos atuadores é sequencial e progressiva conforme REF aumenta:</p>
+
+    <div class="eq-block">
+      <span class="eq-label">(13)</span>
+      jan_lat(%)  = min(100, REF × 1,1)              &nbsp; [REF > 2%]
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(14)</span>
+      jan_sup(%)  = min(100, (REF − 20) × 2,5)       &nbsp; [REF > 20%]
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(15)</span>
+      bomba(%)    = min(100, (REF − 10) × 1,25)      &nbsp; [REF > 10%]
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(16)</span>
+      exaustor(%) = min(100, (REF − 10) × 1,25)      &nbsp; [REF > 10%]
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(17)</span>
+      aluminet(%) = min(100, (REF − 30) × 2,5)       &nbsp; [REF > 30%]
+    </div>
+
+    <table>
+      <thead><tr><th>REF (%)</th><th>Jan. Lat. (%)</th><th>Jan. Sup. (%)</th><th>Bomba (%)</th><th>Exaustor (%)</th><th>Aluminet (%)</th></tr></thead>
+      <tbody>
+        <tr><td class="center">0</td><td class="center">0</td><td class="center">0</td><td class="center">0</td><td class="center">0</td><td class="center">0</td></tr>
+        <tr><td class="center">10</td><td class="center">11</td><td class="center">0</td><td class="center">0</td><td class="center">0</td><td class="center">0</td></tr>
+        <tr><td class="center bold" style="color:#c05000">20 (LEVE)</td><td class="center">22</td><td class="center">0</td><td class="center">12,5</td><td class="center">12,5</td><td class="center">0</td></tr>
+        <tr><td class="center bold" style="color:#c07000">40 (MEDIO)</td><td class="center">44</td><td class="center">50</td><td class="center">37,5</td><td class="center">37,5</td><td class="center">25</td></tr>
+        <tr><td class="center bold" style="color:#a00000">65 (ALTO)</td><td class="center">71,5</td><td class="center">100</td><td class="center">68,75</td><td class="center">68,75</td><td class="center">87,5</td></tr>
+        <tr><td class="center bold" style="color:#800000">90 (MAX)</td><td class="center">99</td><td class="center">100</td><td class="center">100</td><td class="center">100</td><td class="center">100</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>Proteção de vento forte:</strong> quando VV ≥ 12 m/s, jan_lat = jan_sup = exaustor = bomba = 0 (independente de REF).</p>
+
+    <h3 class="sub-title">6.2 HEA (0–100%) → Aquecedores</h3>
+    <table>
+      <thead><tr><th>HEA (%)</th><th>Estágio</th><th>Aquecedores Ativos</th><th>Potência (W)</th><th>Janelas</th></tr></thead>
+      <tbody>
+        <tr><td class="center">&lt; 5%</td><td>0</td><td class="center">0/4</td><td class="center">0</td><td>Posição atual</td></tr>
+        <tr><td class="center">5–27%</td><td>EST. 1</td><td class="center">1/4</td><td class="center">1.500</td><td>Fechadas (reter calor)</td></tr>
+        <tr><td class="center">28–52%</td><td>EST. 2</td><td class="center">2/4</td><td class="center">3.000</td><td>Fechadas</td></tr>
+        <tr><td class="center">53–77%</td><td>EST. 3</td><td class="center">3/4</td><td class="center">4.500</td><td>Fechadas</td></tr>
+        <tr><td class="center">≥ 78%</td><td>MÁXIMO</td><td class="center">4/4</td><td class="center">6.000</td><td>Fechadas</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 7 — MODELO FÍSICO
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec7">
+  <div class="section-header">
+    <span class="sec-num">7</span>
+    <h2>Modelo Físico Térmico — 7 Componentes</h2>
+  </div>
+  <div class="section-body">
+
+    <p>O modelo térmico normalizado calcula a variação de temperatura por tick de 30 segundos como soma de 7 componentes independentes:</p>
+
+    <div class="eq-block">
+      <span class="eq-label">(18)</span>
+      ΔT<sub>total</sub>(k) = ΔT<sub>cond</sub> + ΔT<sub>solar</sub> + ΔT<sub>vent</sub> + ΔT<sub>evap</sub> + ΔT<sub>super</sub> + ΔT<sub>aq</sub> + ΔT<sub>integ</sub>
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(19)</span>
+      TI(k+1) = TI(k) + sat(ΔT<sub>total</sub>)   &nbsp;&nbsp; com sat(·) ∈ [−8, +8] °C/tick
+    </div>
+
+    <h3 class="sub-title">7.1 Componentes de Variação</h3>
+
+    <h4 class="micro-title">1. Condução Natural (ΔT_cond)</h4>
+    <div class="eq-block">
+      <span class="eq-label">(20)</span>
+      ΔT<sub>cond</sub> = (T<sub>E</sub> − T<sub>I</sub>) × Δt / τ<sub>cond</sub>  &nbsp;&nbsp; τ<sub>cond</sub> = 8000 s
+    </div>
+    <p>Arrasta lentamente TI em direção a TE pelas paredes da estufa.</p>
+
+    <h4 class="micro-title">2. Ganho Solar (ΔT_solar)</h4>
+    <div class="eq-block">
+      <span class="eq-label">(21)</span>
+      ΔT<sub>solar</sub> = G<sub>solar</sub>(T<sub>E</sub>) × (1 − α<sub>alm</sub> × 0,88)
+    </div>
+    <div class="eq-block">
+      G<sub>solar</sub> = 0,040 °C/tick (TE ≥ 28°C)
+                       = 0,025 °C/tick (20 ≤ TE &lt; 28)
+                       = 0,008 °C/tick (12 ≤ TE &lt; 20)
+                       = 0,000 °C/tick (TE &lt; 12)
+    </div>
+    <p>O aluminet (0–100%) reduz o ganho solar em até 88%. Com aluminet 100%, reduz de 0,040 para 0,005 °C/tick.</p>
+
+    <h4 class="micro-title">3. Ventilação Natural/Forçada (ΔT_vent)</h4>
+    <div class="eq-block">
+      <span class="eq-label">(22)</span>
+      v<sub>f</sub> = f<sub>jan_lat</sub>×0,6 + f<sub>jan_sup</sub>×0,3 + f<sub>exaustor</sub>×0,5
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(23)</span>
+      ΔT<sub>vent</sub> = (T<sub>E</sub> − T<sub>I</sub>) × Δt / τ<sub>vent</sub>  &nbsp; (apenas se T<sub>I</sub> &gt; T<sub>E</sub>)
+    </div>
+    <div class="eq-block">
+      τ<sub>vent</sub> = τ<sub>vent,B</sub> / (1 + v<sub>f</sub>×3,5 + min(2, VV/4))  &nbsp; τ<sub>vent,B</sub> = 1600 s
+    </div>
+
+    <h4 class="micro-title">4. Resfriamento Evaporativo (ΔT_evap)</h4>
+    <div class="eq-block">
+      <span class="eq-label">(24)</span>
+      ΔT<sub>evap</sub> = (T<sub>pad</sub> − T<sub>I</sub>) × Δt / τ<sub>evap</sub>  &nbsp; (se T<sub>I</sub> &gt; T<sub>pad</sub>)
+    </div>
+    <div class="eq-block">
+      τ<sub>evap</sub> = τ<sub>evap,B</sub> / (f<sub>bomba</sub> × f<sub>exaustor</sub>)  &nbsp; τ<sub>evap,B</sub> = 280 s
+    </div>
+
+    <h4 class="micro-title">5. Superresfriamento (ΔT_super) — CASO A e B</h4>
+    <p>Quando T<sub>I</sub> &gt; SP, um mecanismo de superresfriamento proporcional empurra TI em direção a SP, superando a barreira natural do T<sub>pad</sub>:</p>
+
+    <div class="eq-block">
+      <span class="eq-label">(25a)</span>
+      <strong>CASO A</strong> (T<sub>pad</sub> ≥ SP): gap = T<sub>pad</sub> − SP ≥ 0
+      force = min(1, gap/5) × f<sub>bomba</sub> × f<sub>exaustor</sub>
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(25b)</span>
+      <strong>CASO B</strong> (T<sub>pad</sub> &lt; SP): dist = T<sub>I</sub> − SP
+      force = min(1, dist/4) × f<sub>bomba</sub> × f<sub>exaustor</sub> × 0,6
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(26)</span>
+      ΔT<sub>super</sub> = −(T<sub>I</sub> − SP) × Δt / (τ<sub>super,B</sub> / force)  &nbsp; (se force &gt; 0,005)
+    </div>
+
+    <div class="info-box">
+      <strong>Diferença CASO A × CASO B:</strong><br>
+      <strong>CASO A</strong> (Verão, TE=35 → T_pad=30,2 &gt; SP=25): force proporcional ao gap=5,2 → força máxima.<br>
+      <strong>CASO B</strong> (Quente Seco, TE=28 → T_pad=23,2 &lt; SP=25): a evaporação pura já atingiria SP, mas sem o CASO B o controlador não tinha força proporcional perto do SP → equilíbrio em TI=26°C. O fator 0,6 suaviza a frenagem.
+    </div>
+
+    <h4 class="micro-title">6. Aquecedores Elétricos (ΔT_aq)</h4>
+    <div class="eq-block">
+      <span class="eq-label">(27)</span>
+      T<sub>tgt</sub> = min(T<sub>E</sub> + 35, 60°C)
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(28)</span>
+      ΔT<sub>aq</sub> = (T<sub>tgt</sub> − T<sub>I</sub>) × Δt / τ<sub>aq</sub>  &nbsp; τ<sub>aq</sub> = τ<sub>aq,B</sub> / (N<sub>aq</sub>/4)  &nbsp; τ<sub>aq,B</sub> = 700 s
+    </div>
+
+    <h4 class="micro-title">7. Ação Integral (ΔT_integ)</h4>
+    <p>Detalhado na Seção 8.</p>
+
+    <h3 class="sub-title">7.2 Parâmetros do Modelo</h3>
+    <table>
+      <thead><tr><th>Parâmetro</th><th>Símbolo</th><th>Valor</th><th>Unidade</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td>Tick</td><td class="mono">Δt</td><td class="center bold">30</td><td>s</td><td>Intervalo de simulação</td></tr>
+        <tr><td>TAU condução</td><td class="mono">τ_cond</td><td class="center bold">8000</td><td>s</td><td>Constante de tempo das paredes (≈133 min)</td></tr>
+        <tr><td>TAU ventilação base</td><td class="mono">τ_vent,B</td><td class="center bold">1600</td><td>s</td><td>Sem abertura nem vento</td></tr>
+        <tr><td>TAU evaporação base</td><td class="mono">τ_evap,B</td><td class="center bold">280</td><td>s</td><td>Bomba e exaustor a 100%</td></tr>
+        <tr><td>TAU superresfr. base</td><td class="mono">τ_super,B</td><td class="center bold">35</td><td>s</td><td>Força máxima (force=1)</td></tr>
+        <tr><td>TAU aquecimento base</td><td class="mono">τ_aq,B</td><td class="center bold">700</td><td>s</td><td>1 aquecedor a 100%</td></tr>
+        <tr><td>Delta aq. máx.</td><td class="mono">ΔT_aq,max</td><td class="center bold">35</td><td>°C</td><td>Aquecedores: T_E + 35°C</td></tr>
+        <tr><td>Norm. gap</td><td class="mono">GAP_NORM</td><td class="center bold">5</td><td>°C</td><td>gap=5°C → force máxima</td></tr>
+        <tr><td>Eficiência pad</td><td class="mono">η_evap</td><td class="center bold">0,88</td><td>—</td><td>Eficiência evaporativa</td></tr>
+        <tr><td>Umidade relativa</td><td class="mono">HR</td><td class="center bold">0,55</td><td>—</td><td>55% (típico)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 8 — AÇÃO INTEGRAL
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec8">
+  <div class="section-header">
+    <span class="sec-num">8</span>
+    <h2>Ação Integral PD+I — Eliminação de Offset</h2>
+  </div>
+  <div class="section-body">
+
+    <h3 class="sub-title">8.1 Motivação</h3>
+    <p>O controlador fuzzy puro é essencialmente proporcional-derivativo (PD). Em presença de perturbações constantes (ganho solar, condução), o sistema pode atingir um estado de equilíbrio estacionário com E ≠ 0 — o chamado <em>offset</em>.</p>
+
+    <div class="warn-box">
+      <strong>Problema Identificado:</strong> Cenário Verão (TE=35°C). Com REF≈33%, aluminet≈8%. Equilíbrio perfeito: ΔT_cond(+0,034) + ΔT_solar(+0,037) = ΔT_super(−0,071). TI estabilizava em 25,99°C (E=−0,99°C) em vez de 25°C.
+    </div>
+
+    <h3 class="sub-title">8.2 Mecanismo da Ação Integral</h3>
+    <p>O integrador acumula o erro dentro de uma banda de integração [0,3°C, 2,5°C] e aplica duas ações complementares:</p>
+
+    <div class="eq-block">
+      <span class="eq-label">(29)</span>
+      I<sub>ref</sub>(k) = min(I<sub>max</sub>, I<sub>ref</sub>(k−1) + |E(k)|)  &nbsp; se 0,3 &lt; |E| &lt; 2,5 e E &lt; 0
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(30)</span>
+      I<sub>hea</sub>(k) = min(I<sub>max</sub>, I<sub>hea</sub>(k−1) + E(k))  &nbsp; se 0,3 &lt; E &lt; 2,5
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(31)</span>
+      I(k) = I(k−1) × 0,75  &nbsp; se |E| ≤ 0,3°C (decaimento ao atingir SP)
+    </div>
+
+    <table>
+      <thead><tr><th>Parâmetro</th><th>Valor</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td>I_max (anti-windup)</td><td class="center bold">60</td><td>Limite máximo do acumulador (°C·tick)</td></tr>
+        <tr><td>Bomba mínima integral</td><td class="center bold">55%</td><td>% mínimo forçado quando Iref=I_max</td></tr>
+        <tr><td>Boost aquecedor max</td><td class="center bold">3×</td><td>τ_aq_eff = τ_aq / 3 quando I_hea=I_max</td></tr>
+        <tr><td>Banda de integração</td><td class="center bold">±[0,3; 2,5]°C</td><td>Fora desta banda: sem integração</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">8.3 Ação 1: Aluminet Integral (Anti-offset Solar)</h3>
+    <p>O integrador fecha o aluminet progressivamente, bloqueando o ganho solar que sustenta o equilíbrio estacionário:</p>
+
+    <div class="eq-block">
+      <span class="eq-label">(32)</span>
+      α<sub>alm,int</sub> = (I<sub>ref</sub> / I<sub>max</sub>) × 100%
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(33)</span>
+      α<sub>alm,final</sub> = max(α<sub>alm,fuzzy</sub>, α<sub>alm,int</sub>)
+    </div>
+    <p><strong>Efeito físico:</strong> Com aluminet 0% → ΔT_solar = +0,040°C/tick. Com aluminet 100% → ΔT_solar = +0,005°C/tick. A redução de −0,035°C/tick quebra o equilíbrio estacionário.</p>
+
+    <h3 class="sub-title">8.4 Ação 2: Boost da Bomba/Exaustor</h3>
+    <p>Força a bomba e o exaustor a operar com potência mínima garantida:</p>
+
+    <div class="eq-block">
+      <span class="eq-label">(34)</span>
+      f<sub>bomba,eff</sub> = max(f<sub>bomba</sub>, (BOMBA_INT_MIN × I<sub>ref</sub>/I<sub>max</sub>) / 100)
+    </div>
+    <p>Isso mantém a potência de superresfriamento ativa mesmo quando REF fuzzy é reduzido próximo ao SP.</p>
+
+    <h3 class="sub-title">8.5 Ação 3: Boost do Aquecedor</h3>
+    <div class="eq-block">
+      <span class="eq-label">(35)</span>
+      boost<sub>hea</sub> = 1 + (3 − 1) × (I<sub>hea</sub>/I<sub>max</sub>)  &nbsp; ∈ [1, 3]
+    </div>
+    <div class="eq-block">
+      <span class="eq-label">(36)</span>
+      τ<sub>aq,eff</sub> = τ<sub>aq</sub> / boost<sub>hea</sub>  &nbsp; → 3× mais rápido no máximo
+    </div>
+
+    <div class="highlight-box">
+      <strong>Resultado da Ação Integral:</strong> Cenário Verão — ao tick T53, aluminet subiu para 73% (I_ref=44), ΔT_solar reduziu de +0,037 para +0,007°C/tick, quebrando o equilíbrio. TI descendeu de 25,99°C para SP=25°C com TI_final=25,49°C (erro=−0,49°C ≤ ±0,5°C).
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 9 — CENÁRIOS
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec9">
+  <div class="section-header">
+    <span class="sec-num">9</span>
+    <h2>Cenários de Validação</h2>
+  </div>
+  <div class="section-body">
+    <p>Oito cenários climáticos distintos foram selecionados para cobrir o espaço de operação completo do controlador, desde verão tropical até noite de inverno:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Nome</th><th>TI₀ (°C)</th><th>TE (°C)</th><th>VV (m/s)</th><th>SP (°C)</th><th>T_pad (°C)</th><th>Caso</th><th>Desafio Principal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="center bold">1</td><td>🌞 VERÃO INTENSO</td>
+          <td class="center">38</td><td class="center">35</td><td class="center">2</td><td class="center">25</td><td class="center">30,2</td>
+          <td class="center">A</td>
+          <td>TE muito alta, T_pad &gt; SP. Equilib. em 25,99°C (offset solar)</td>
+        </tr>
+        <tr>
+          <td class="center bold">2</td><td>🌙 INVERNO NOITE</td>
+          <td class="center">8</td><td class="center">3</td><td class="center">5</td><td class="center">18</td><td class="center">−1,5</td>
+          <td class="center">HEA</td>
+          <td>TI muito baixa, risco de geada, aquecimento máximo necessário</td>
+        </tr>
+        <tr>
+          <td class="center bold">3</td><td>🌤 QUENTE SECO</td>
+          <td class="center">34</td><td class="center">28</td><td class="center">3</td><td class="center">25</td><td class="center">23,2</td>
+          <td class="center">B</td>
+          <td>T_pad &lt; SP: sem CASO B, equilíbrio em TI=26°C</td>
+        </tr>
+        <tr>
+          <td class="center bold">4</td><td>🌃 NOITE QUENTE</td>
+          <td class="center">30</td><td class="center">25</td><td class="center">3</td><td class="center">26</td><td class="center">21,0</td>
+          <td class="center">B</td>
+          <td>Resfriamento moderado, T_pad bem abaixo do SP</td>
+        </tr>
+        <tr>
+          <td class="center bold">5</td><td>🌱 MANHÃ PRIMAVERA</td>
+          <td class="center">22</td><td class="center">18</td><td class="center">4</td><td class="center">22</td><td class="center">14,3</td>
+          <td class="center">Zero</td>
+          <td>TI ≈ SP inicial — estabilidade imediata</td>
+        </tr>
+        <tr>
+          <td class="center bold">6</td><td>⛈ TEMPESTADE</td>
+          <td class="center">20</td><td class="center">15</td><td class="center">13</td><td class="center">20</td><td class="center">11,5</td>
+          <td class="center">Zero</td>
+          <td>VV=13 m/s: proteção fecha janelas/exaustores</td>
+        </tr>
+        <tr>
+          <td class="center bold">7</td><td>☁ NUBLADO FRIO</td>
+          <td class="center">12</td><td class="center">8</td><td class="center">6</td><td class="center">20</td><td class="center">4,3</td>
+          <td class="center">HEA</td>
+          <td>TI fria, aquecimento longo, sem solar</td>
+        </tr>
+        <tr>
+          <td class="center bold">8</td><td>💨 CALOR VENTO</td>
+          <td class="center">32</td><td class="center">28</td><td class="center">10</td><td class="center">25</td><td class="center">23,2</td>
+          <td class="center">B</td>
+          <td>VV=10 m/s: vento moderado, janelas abertas ajudam</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 10 — RESULTADOS
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec10">
+  <div class="section-header">
+    <span class="sec-num">10</span>
+    <h2>Resultados e Análise de Convergência</h2>
+  </div>
+  <div class="section-body">
+
+    <div class="result-grid">
+      <div class="result-card green">
+        <div class="val">8/8</div>
+        <div class="lbl">Cenários Convergidos<br>SP ±0,5°C</div>
+      </div>
+      <div class="result-card blue">
+        <div class="val">0,00°C</div>
+        <div class="lbl">Overshoot Máximo<br>Zero em todos</div>
+      </div>
+      <div class="result-card orange">
+        <div class="val">&lt;0.5°C</div>
+        <div class="lbl">Erro Máximo<br>Estado estacionário</div>
+      </div>
+      <div class="result-card green">
+        <div class="val">30s</div>
+        <div class="lbl">Período de Amostragem<br>Tick de simulação</div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Cenário</th><th>TI₀</th><th>SP</th><th>TI_final</th><th>Tick SP</th><th>Tempo SP</th><th>Overshoot</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>VERÃO INTENSO</td><td class="center">38°C</td><td class="center">25°C</td><td class="center bold">25,49°C</td><td class="center">T053</td><td class="center">1590s</td><td class="center">0,00°C</td><td class="center">✅</td></tr>
+        <tr><td>INVERNO NOITE</td><td class="center">8°C</td><td class="center">18°C</td><td class="center bold">17,71°C</td><td class="center">T021</td><td class="center">630s</td><td class="center">0,00°C</td><td class="center">✅</td></tr>
+        <tr><td>QUENTE SECO</td><td class="center">34°C</td><td class="center">25°C</td><td class="center bold">25,48°C</td><td class="center">T049</td><td class="center">1470s</td><td class="center">0,00°C</td><td class="center">✅</td></tr>
+        <tr><td>NOITE QUENTE</td><td class="center">30°C</td><td class="center">26°C</td><td class="center bold">26,47°C</td><td class="center">T013</td><td class="center">390s</td><td class="center">0,00°C</td><td class="center">✅</td></tr>
+        <tr><td>MANHÃ PRIMAVERA</td><td class="center">22°C</td><td class="center">22°C</td><td class="center bold">21,99°C</td><td class="center">T001</td><td class="center">30s</td><td class="center">0,00°C</td><td class="center">✅</td></tr>
+        <tr><td>TEMPESTADE</td><td class="center">20°C</td><td class="center">20°C</td><td class="center bold">19,99°C</td><td class="center">T001</td><td class="center">30s</td><td class="center">0,00°C</td><td class="center">✅</td></tr>
+        <tr><td>NUBLADO FRIO</td><td class="center">12°C</td><td class="center">20°C</td><td class="center bold">19,50°C</td><td class="center">T015</td><td class="center">450s</td><td class="center">0,00°C</td><td class="center">✅</td></tr>
+        <tr><td>CALOR VENTO</td><td class="center">32°C</td><td class="center">25°C</td><td class="center bold">25,47°C</td><td class="center">T049</td><td class="center">1470s</td><td class="center">0,00°C</td><td class="center">✅</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">10.1 Análise do Cenário Mais Crítico (VERÃO INTENSO)</h3>
+    <p>O cenário verão apresenta o maior desafio: TE=35°C → T_pad=30,2°C &gt; SP=25°C. Sem ação integral, o sistema ficava preso em TI=25,99°C por equilíbrio entre ΔT_solar e ΔT_super.</p>
+
+    <p><strong>Evolução da convergência:</strong></p>
+    <ul>
+      <li><strong>T0–T10:</strong> TI cai rapidamente de 38°C. REF=MAX (90%). Superresfriamento ativo com força máxima.</li>
+      <li><strong>T10–T30:</strong> TI entre 28°C e 26°C. REF reduz para ~55%. Aluminet ainda baixo.</li>
+      <li><strong>T30–T45:</strong> TI próxima de 26°C. E≈−1°C. Integrador começa a acumular I_ref.</li>
+      <li><strong>T45–T53:</strong> I_ref≈44 → aluminet_int=73% &gt; aluminet_fuzzy. ΔT_solar cai para 0,007°C/tick. Equilíbrio quebrado.</li>
+      <li><strong>T53:</strong> TI=25,49°C → |E|=0,49°C ≤ 0,5°C ✅. Integrador decai (×0,75/tick).</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 11 — COMPARAÇÃO FUZZY vs ON/OFF
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec11">
+  <div class="section-header">
+    <span class="sec-num">11</span>
+    <h2>Comparação: Fuzzy MIMO vs Controle ON/OFF</h2>
+  </div>
+  <div class="section-body">
+
+    <p>O controle ON/OFF utiliza histerese de ±2°C: resfriamento ligado quando TI &gt; SP+2°C, desligado quando TI &lt; SP+2°C; aquecimento quando TI &lt; SP−2°C.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Critério</th><th>Fuzzy MIMO</th><th>ON/OFF</th><th>Vantagem</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Precisão (erro max.)</td><td class="center bold">±0,5°C</td><td class="center">±2,0°C</td><td class="center bold" style="color:green">Fuzzy 4× melhor</td></tr>
+        <tr><td>Overshoot</td><td class="center bold">0,00°C</td><td class="center">~1,0–3,0°C</td><td class="center bold" style="color:green">Fuzzy zero overshoot</td></tr>
+        <tr><td>Convergência VERÃO</td><td class="center bold">T053 (1590s)</td><td class="center">Não converge ao SP</td><td class="center bold" style="color:green">Fuzzy converge</td></tr>
+        <tr><td>Eficiência energética</td><td class="center bold">Alta (proporcional)</td><td class="center">Baixa (full power)</td><td class="center bold" style="color:green">Fuzzy mais eficiente</td></tr>
+        <tr><td>Número de chaveamentos</td><td class="center bold">Suave</td><td class="center">Frequente (ciclagem)</td><td class="center bold" style="color:green">Menos desgaste</td></tr>
+        <tr><td>Adaptação climática</td><td class="center bold">Sim (TE, VV)</td><td class="center">Não</td><td class="center bold" style="color:green">Fuzzy adaptativo</td></tr>
+        <tr><td>Temperatura de bulbo úmido</td><td class="center bold">Considerada (T_pad)</td><td class="center">Ignorada</td><td class="center bold" style="color:green">Fuzzy mais realista</td></tr>
+        <tr><td>Complexidade de implementação</td><td class="center">Alta</td><td class="center bold">Baixa</td><td class="center">ON/OFF mais simples</td></tr>
+      </tbody>
+    </table>
+
+    <div class="highlight-box">
+      <strong>Conclusão da Comparação:</strong> O controlador fuzzy MIMO supera o ON/OFF em todos os critérios de desempenho relevantes para aplicações agrícolas, onde a precisão de temperatura diretamente afeta a produtividade das culturas. A maior complexidade de implementação é justificada pelos ganhos em precisão, eficiência energética e adaptabilidade.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 12 — CONCLUSÕES
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec12">
+  <div class="section-header">
+    <span class="sec-num">12</span>
+    <h2>Conclusões e Trabalhos Futuros</h2>
+  </div>
+  <div class="section-body">
+
+    <h3 class="sub-title">12.1 Conclusões</h3>
+    <ul>
+      <li>O controlador fuzzy Mamdani MIMO proposto converge ao setpoint em <strong>todos os 8 cenários</strong> testados, cobrindo o espectro completo de condições climáticas típicas do sul do Brasil;</li>
+      <li>O <strong>overshoot é zero</strong> em todos os cenários — característica importante para culturas sensíveis a variações bruscas de temperatura;</li>
+      <li>A <strong>ação integral sobre o aluminet</strong> resolve elegantemente o problema de offset estacionário causado pelo ganho solar, sem introduzir instabilidade;</li>
+      <li>A separação em <strong>CASO A e B</strong> para o superresfriamento garante convergência mesmo quando T_pad &lt; SP;</li>
+      <li>O controlador é <strong>mais eficiente energeticamente</strong> que o ON/OFF por operar proporcionalmente;</li>
+      <li>A base de 54 regras captura adequadamente o conhecimento especialista em climatização de estufas.</li>
+    </ul>
+
+    <h3 class="sub-title">12.2 Trabalhos Futuros</h3>
+    <ul>
+      <li><strong>ANFIS:</strong> Aprendizado das regras a partir de dados históricos de telemetria;</li>
+      <li><strong>Variáveis dinâmicas:</strong> Incorporar umidade relativa interna, CO₂ e luminosidade como entradas adicionais;</li>
+      <li><strong>Implementação embarcada:</strong> Transposição do controlador para microcontrolador (ESP32/Arduino) com comunicação MQTT;</li>
+      <li><strong>Otimização de energia:</strong> Incluir tarifa energética como entrada para reduzir consumo nos horários de pico;</li>
+      <li><strong>Validação experimental:</strong> Testes em estufa real com dados de sensores para calibração do modelo físico.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SEÇÃO 13 — REFERÊNCIAS
+     ══════════════════════════════════════════════════════════ -->
+<div class="section-card" id="sec13">
+  <div class="section-header">
+    <span class="sec-num">13</span>
+    <h2>Referências</h2>
+  </div>
+  <div class="section-body">
+    <ol style="line-height:2.2">
+      <li>ZADEH, L. A. <em>Fuzzy sets.</em> Information and Control, v. 8, n. 3, p. 338–353, 1965.</li>
+      <li>MAMDANI, E. H.; ASSILIAN, S. <em>An experiment in linguistic synthesis with a fuzzy logic controller.</em> International Journal of Man-Machine Studies, v. 7, n. 1, p. 1–13, 1975.</li>
+      <li>SUGENO, M. <em>Industrial Applications of Fuzzy Control.</em> Elsevier, 1985.</li>
+      <li>KALOGIROU, S. A. <em>Applications of artificial neural-networks for energy systems.</em> Applied Energy, v. 67, n. 1-2, p. 17–35, 2000.</li>
+      <li>COELHO, J. P.; OLIVEIRA, P. B. M.; CUNHA, J. B. <em>Greenhouse air temperature predictive control using the particle swarm optimisation algorithm.</em> Computers and Electronics in Agriculture, v. 49, n. 3, p. 330–344, 2005.</li>
+      <li>SALGADO, P.; CUNHA, J. B. <em>Greenhouse climate hierarchical fuzzy modelling.</em> Control Engineering Practice, v. 13, n. 5, p. 613–628, 2005.</li>
+      <li>ABREU, P. E.; MENESES, J. F.; SANTOS, J. O. <em>Evaporative cooling using a pad-and-fan system.</em> Acta Horticulturae, v. 534, p. 131–138, 2000.</li>
+      <li>JANG, J. S. R. <em>ANFIS: Adaptive-Network-Based Fuzzy Inference System.</em> IEEE Transactions on Systems, Man, and Cybernetics, v. 23, n. 3, p. 665–685, 1993.</li>
+      <li>ROSS, T. J. <em>Fuzzy Logic with Engineering Applications.</em> 3. ed. Wiley, 2010.</li>
+      <li>TANAKA, K. <em>An Introduction to Fuzzy Logic for Practical Applications.</em> Springer, 1997.</li>
+    </ol>
+  </div>
+</div>
+
+</div><!-- /doc-body -->
+
+<footer>
+  🌿 GreenHouse Fuzzy MIMO Simulator — Documento Técnico v4.0 &nbsp;|&nbsp;
+  JucemarFC — UFSC &nbsp;|&nbsp; 2026 &nbsp;|&nbsp;
+  Controlador Mamdani · 4 entradas · 2 saídas · 54 regras
+</footer>
+
+<!-- Botão de impressão -->
+<button class="btn-print no-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
+
+</body>
+</html>

@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GreenHouse — Fuzzy MIMO Simulator | JucemarFC UFSC</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-deep: #060c18;
+  --bg-main: #0a1020;
+  --bg-panel: #0f1829;
+  --bg-card: #141f35;
+  --bg-input: #0d1628;
+  --border: #1e3050;
+  --border-glow: #00ff8830;
+  --green: #00ff88;
+  --green-dim: #00cc6a;
+  --green-dark: #00441e;
+  --blue: #00aaff;
+  --blue-dim: #0077bb;
+  --cyan: #00eeff;
+  --orange: #ff8800;
+  --red: #ff3355;
+  --yellow: #ffcc00;
+  --purple: #aa44ff;
+  --text-primary: #e0f0ff;
+  --text-secondary: #7090b0;
+  --text-muted: #405070;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Inter', sans-serif;
+  --radius: 8px;
+  --radius-sm: 4px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.5);
+  --glow-green: 0 0 12px rgba(0,255,136,0.25);
+  --glow-blue: 0 0 12px rgba(0,170,255,0.25);
+  --glow-red: 0 0 12px rgba(255,51,85,0.25);
+  --glow-orange: 0 0 12px rgba(255,136,0,0.25);
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+/* ===== HEADER ===== */
+#header {
+  height: 58px;
+  background: linear-gradient(90deg, #060c18 0%, #0a1530 40%, #060c18 100%);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 16px;
+  position: relative;
+  z-index: 100;
+  flex-shrink: 0;
+}
+#header::before {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--green), transparent);
+  opacity: 0.4;
+}
+.header-icon {
+  font-size: 22px;
+  color: var(--green);
+  text-shadow: var(--glow-green);
+}
+.header-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 20px rgba(0,255,136,0.4);
+  flex: 1;
+  line-height: 1.2;
+}
+.header-title .sub1 {
+  color: var(--text-secondary);
+  font-weight: 400;
+  font-size: 10.5px;
+  display: block;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.header-status {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: all 0.3s;
+}
+.status-dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 1.5s infinite; }
+.status-dot.warn { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+.status-dot.danger { background: var(--red); box-shadow: 0 0 6px var(--red); animation: pulse 0.8s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+#clock { font-family: var(--font-mono); font-size: 11px; color: var(--cyan); }
+.sim-time-display { font-family: var(--font-mono); font-size: 12px; color: var(--green); background: var(--bg-card); padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+
+/* ===== LAYOUT ===== */
+#app {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  grid-template-rows: calc(100vh - 58px - 28px);
+  gap: 6px;
+  padding: 6px;
+  height: calc(100vh - 58px);
+  overflow: hidden;
+}
+#left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+#right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+
+/* ===== PANELS ===== */
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow);
+}
+.panel:hover { border-color: #2a4070; }
+
+.panel-header {
+  background: linear-gradient(90deg, #0d1829, #111f35);
+  border-bottom: 1px solid var(--border);
+  padding: 7px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.panel-header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+  flex: 1;
+}
+.panel-icon { color: var(--green); font-size: 12px; }
+.panel-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 20px;
+  border: 1px solid;
+}
+.badge-green { color: var(--green); border-color: var(--green); background: #00ff8810; }
+.badge-blue { color: var(--blue); border-color: var(--blue); background: #00aaff10; }
+.badge-orange { color: var(--orange); border-color: var(--orange); background: #ff880010; }
+.badge-red { color: var(--red); border-color: var(--red); background: #ff335510; }
+.badge-yellow { color: var(--yellow); border-color: var(--yellow); background: #ffcc0010; }
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+}
+.panel-body::-webkit-scrollbar { width: 4px; }
+.panel-body::-webkit-scrollbar-track { background: var(--bg-deep); }
+.panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Painel 1 - Configuração */
+#panel-config { flex: 0 0 auto; }
+#panel-config .panel-body { overflow: visible; max-height: none; }
+#panel-config .form-section { margin-bottom: 7px; }
+/* Painel 2 - Log */
+#panel-log { flex: 1; min-height: 0; }
+/* Painel 3 (esq) - Export */
+#panel-export { flex: 0 0 auto; }
+/* Painel 3 - Visualização */
+#panel-viz { flex: 1; min-height: 0; }
+/* Painel 4 - Resultados */
+#panel-results { flex: 0 0 auto; max-height: 42vh; }
+
+/* ===== FORM ELEMENTS ===== */
+.form-section {
+  margin-bottom: 10px;
+}
+.form-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.input-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.input-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+.input-group { display: flex; flex-direction: column; gap: 3px; }
+.input-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.input-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--green);
+  font-weight: 500;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--green);
+  cursor: pointer;
+  box-shadow: 0 0 6px var(--green);
+  transition: all 0.2s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  width: 14px; height: 14px;
+  box-shadow: 0 0 10px var(--green);
+}
+
+input[type="number"], input[type="text"], select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 7px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+input[type="number"]:focus, input[type="text"]:focus, select:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px var(--border-glow);
+}
+select { cursor: pointer; }
+select option { background: var(--bg-card); }
+
+/* ===== BUTTONS ===== */
+.btn-row { display: flex; gap: 5px; margin-top: 8px; }
+.btn {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.btn:active { transform: scale(0.97); }
+.btn-green { background: #00ff8818; border-color: var(--green); color: var(--green); }
+.btn-green:hover { background: #00ff8830; box-shadow: var(--glow-green); }
+.btn-green.active { background: var(--green); color: var(--bg-deep); box-shadow: var(--glow-green); }
+.btn-yellow { background: #ffcc0010; border-color: var(--yellow); color: var(--yellow); }
+.btn-yellow:hover { background: #ffcc0025; box-shadow: 0 0 12px rgba(255,204,0,0.25); }
+.btn-red { background: #ff335510; border-color: var(--red); color: var(--red); }
+.btn-red:hover { background: #ff335525; box-shadow: var(--glow-red); }
+.btn-blue { background: #00aaff10; border-color: var(--blue); color: var(--blue); }
+.btn-blue:hover { background: #00aaff25; box-shadow: var(--glow-blue); }
+.btn-purple { background: #aa44ff10; border-color: var(--purple); color: var(--purple); }
+.btn-purple:hover { background: #aa44ff25; }
+.btn-sm { padding: 4px 8px; font-size: 10px; flex: none; }
+
+/* ===== SPEED CONTROL ===== */
+.speed-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.speed-btn {
+  padding: 3px 7px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.speed-btn:hover { border-color: var(--blue); color: var(--blue); }
+.speed-btn.active { border-color: var(--blue); color: var(--blue); background: #00aaff15; box-shadow: var(--glow-blue); }
+
+/* ===== LOG PANEL ===== */
+#log-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.log-entry {
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border-left: 2px solid var(--border);
+  line-height: 1.5;
+  animation: fadeIn 0.3s ease;
+  transition: all 0.2s;
+}
+.log-entry:hover { background: #1a2840; }
+@keyframes fadeIn { from { opacity: 0; transform: translateX(-5px); } to { opacity: 1; transform: translateX(0); } }
+.log-entry.info { border-color: var(--blue); }
+.log-entry.warn { border-color: var(--yellow); }
+.log-entry.danger { border-color: var(--red); }
+.log-entry.success { border-color: var(--green); }
+.log-entry.action { border-color: var(--purple); }
+.log-time { color: var(--text-muted); margin-right: 4px; }
+.log-msg { color: var(--text-primary); }
+
+.rules-active-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  background: #0d1829;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
+.rules-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.rules-badge {
+  background: var(--purple);
+  color: var(--bg-deep);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+.rules-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  flex: 1;
+}
+.rule-chip {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: #aa44ff20;
+  border: 1px solid #aa44ff40;
+  color: var(--purple);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.rule-chip:hover { background: #aa44ff35; }
+
+/* ===== VISUALIZATION TABS ===== */
+.tab-header {
+  display: flex;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tab-btn {
+  padding: 7px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.tab-btn:hover { color: var(--text-secondary); }
+.tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+.tab-content { display: none; flex: 1; padding: 10px; overflow: auto; }
+.tab-content.active { display: flex; flex-direction: column; gap: 10px; }
+
+/* ===== CHARTS ===== */
+.chart-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  position: relative;
+}
+.chart-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 8px;
+}
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* ===== GREENHOUSE SVG ===== */
+#greenhouse-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gh-views {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.gh-view-title {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+/* ===== MINI SENSOR CARDS (coluna esquerda da barra superior) ===== */
+.mini-sensor-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  transition: border-color 0.3s;
+}
+.mini-sensor-card:hover { border-color: #2a4070; }
+.msc-left { display: flex; align-items: center; gap: 6px; }
+.msc-icon { font-size: 14px; flex-shrink: 0; }
+.msc-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.msc-trend { font-size: 9px; color: var(--text-muted); margin-top: 1px; }
+.msc-value {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+.msc-value.ok   { color: var(--green); text-shadow: 0 0 8px rgba(0,255,136,0.3); }
+.msc-value.hot  { color: var(--red);   text-shadow: 0 0 8px rgba(255,51,85,0.3); }
+.msc-value.warm { color: var(--orange); }
+.msc-value.cool { color: var(--blue); }
+.msc-value.cold { color: var(--cyan);  text-shadow: 0 0 8px rgba(0,238,255,0.3); }
+.msc-unit { font-size: 10px; font-weight: 400; color: var(--text-secondary); }
+
+/* ===== ACTUATOR GRID COMPACTO ===== */
+.actuator-grid-compact {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 4px;
+  height: 100%;
+}
+.act-card-mini {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 7px;
+  transition: all 0.3s;
+}
+.act-card-mini.active-act  { border-color: var(--green);  box-shadow: 0 0 6px rgba(0,255,136,0.2); }
+.act-card-mini.cooling     { border-color: var(--blue);   box-shadow: 0 0 6px rgba(0,170,255,0.2); }
+.act-card-mini.heating     { border-color: var(--orange); box-shadow: 0 0 6px rgba(255,136,0,0.2); }
+.act-card-mini.warning-act { border-color: var(--yellow); }
+.acm-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+.acm-name {
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.acm-val {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.acm-val.on              { color: var(--green); }
+.acm-val.heating-color   { color: var(--orange); }
+.acm-val.cooling-color   { color: var(--blue); }
+.acm-detail {
+  font-size: 8px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== RESULTADOS COMPACTOS ===== */
+.res-section-title {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 5px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--border);
+}
+.res-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+}
+.res-metric {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 5px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.res-met-lbl {
+  font-size: 8.5px;
+  color: var(--text-muted);
+  flex: 1;
+  min-width: 0;
+}
+.res-met-val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+}
+.res-met-val.warn   { color: var(--yellow); }
+.res-met-val.blue   { color: var(--blue); }
+.res-met-val.orange { color: var(--orange); }
+.res-met-unit {
+  font-size: 8px;
+  color: var(--text-muted);
+}
+
+/* ===== TABELA COMPARATIVA MINI ===== */
+.cmp-table-mini {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  margin-top: 4px;
+}
+.cmp-table-mini th {
+  background: var(--bg-deep);
+  color: var(--text-muted);
+  padding: 3px 5px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.cmp-table-mini td {
+  padding: 3px 5px;
+  border-bottom: 1px solid #0d1828;
+  text-align: center;
+  color: var(--text-primary);
+  font-size: 9px;
+}
+.cmp-table-mini tr:hover td { background: #1a2840; }
+.cmp-table-mini .best-val   { color: var(--green) !important; font-weight: 700; }
+
+
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.actuator-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  transition: all 0.3s;
+}
+.actuator-card.active-act { border-color: var(--green); box-shadow: var(--glow-green); }
+.actuator-card.heating { border-color: var(--orange); box-shadow: var(--glow-orange); }
+.actuator-card.cooling { border-color: var(--blue); box-shadow: var(--glow-blue); }
+.actuator-card.warning-act { border-color: var(--yellow); }
+.act-icon { font-size: 18px; margin-bottom: 4px; display: block; text-align: center; }
+.act-name { font-size: 9px; color: var(--text-secondary); text-align: center; text-transform: uppercase; letter-spacing: 0.5px; }
+.act-value {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin: 3px 0;
+}
+.act-value.on { color: var(--green); }
+.act-value.heating-color { color: var(--orange); }
+.act-value.cooling-color { color: var(--blue); }
+.act-detail { font-size: 9px; color: var(--text-muted); text-align: center; line-height: 1.4; }
+.act-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.act-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--text-muted);
+  transition: width 0.5s ease;
+}
+
+/* ===== MEMBERSHIP FUNCTIONS ===== */
+#mf-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.mf-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+.mf-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--green);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.mf-canvas-wrap { position: relative; }
+
+/* ===== ANFIS PANEL ===== */
+.anfis-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.anfis-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.anfis-table th {
+  background: var(--bg-deep);
+  color: var(--text-secondary);
+  padding: 5px 8px;
+  text-align: left;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+}
+.anfis-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #0d1828;
+  color: var(--text-primary);
+}
+.anfis-table tr:hover td { background: #1a2840; }
+
+/* ===== RESULTS PANEL ===== */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.metric-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  text-align: center;
+}
+.metric-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.metric-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--green);
+}
+.metric-unit {
+  font-size: 9px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.metric-card.warn-metric .metric-value { color: var(--yellow); }
+.metric-card.danger-metric .metric-value { color: var(--red); }
+.metric-card.blue-metric .metric-value { color: var(--blue); }
+.metric-card.orange-metric .metric-value { color: var(--orange); }
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.comparison-table th {
+  background: #0d1829;
+  color: var(--text-secondary);
+  padding: 5px 8px;
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  border: 1px solid var(--border);
+}
+.comparison-table td {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  text-align: center;
+  color: var(--text-primary);
+}
+.comparison-table tr:nth-child(1) td:first-child { color: var(--green); font-weight: 600; }
+.comparison-table tr:nth-child(2) td:first-child { color: var(--blue); font-weight: 600; }
+.comparison-table tr:nth-child(3) td:first-child { color: var(--yellow); font-weight: 600; }
+.best-val { color: var(--green) !important; font-weight: 700; }
+.comparison-table tr:hover td { background: #1a2840; }
+
+.export-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  margin-top: 8px;
+}
+
+/* ===== ODS SECTION ===== */
+.ods-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.ods-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ods-icon { font-size: 18px; flex-shrink: 0; }
+.ods-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.ods-value { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--green); }
+
+/* ===== TEMPERATURE DISPLAY ===== */
+.temp-display {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.temp-card {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.temp-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.temp-value {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  margin: 4px 0;
+}
+.temp-value.hot { color: var(--red); text-shadow: 0 0 15px rgba(255,51,85,0.4); }
+.temp-value.warm { color: var(--orange); }
+.temp-value.ok { color: var(--green); text-shadow: 0 0 15px rgba(0,255,136,0.4); }
+.temp-value.cool { color: var(--blue); }
+.temp-value.cold { color: var(--cyan); text-shadow: 0 0 15px rgba(0,238,255,0.4); }
+.temp-unit { font-size: 12px; color: var(--text-secondary); }
+.temp-trend { font-size: 11px; }
+.temp-trend.up { color: var(--red); }
+.temp-trend.down { color: var(--blue); }
+.temp-trend.stable { color: var(--green); }
+.temp-error { font-size: 10px; font-family: var(--font-mono); color: var(--text-secondary); margin-top: 2px; }
+
+/* ===== TOOLTIP ===== */
+.tooltip { position: relative; cursor: help; }
+.tooltip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a2840;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 10px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 1000;
+}
+.tooltip:hover::after { opacity: 1; }
+
+/* ===== PROGRESS BARS ===== */
+.progress-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 4px 0;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.progress-fill.green { background: linear-gradient(90deg, var(--green-dim), var(--green)); }
+.progress-fill.blue { background: linear-gradient(90deg, var(--blue-dim), var(--blue)); }
+.progress-fill.orange { background: linear-gradient(90deg, #cc6600, var(--orange)); }
+.progress-fill.red { background: linear-gradient(90deg, #cc0022, var(--red)); }
+.progress-fill.yellow { background: linear-gradient(90deg, #cc9900, var(--yellow)); }
+
+/* ===== FOOTER ===== */
+#footer {
+  height: 22px;
+  background: var(--bg-deep);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+#footer span {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+#footer .footer-sep { color: var(--border); }
+#footer .footer-green { color: var(--green); opacity: 0.7; }
+
+/* ===== MODAL / OVERLAY ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+.modal-title { font-size: 14px; font-weight: 600; color: var(--green); margin-bottom: 12px; }
+.modal-body { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+
+/* ===== DIVIDERS ===== */
+.section-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0;
+}
+
+/* ===== GLOWING BORDER ANIMATION ===== */
+@keyframes borderGlow {
+  0%, 100% { box-shadow: 0 0 0px rgba(0,255,136,0); }
+  50% { box-shadow: 0 0 12px rgba(0,255,136,0.3); }
+}
+.panel.running { animation: borderGlow 2s infinite; }
+
+/* ===== LOADING ANIMATION ===== */
+.spinner {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== SCROLLABLE TABLES ===== */
+.table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+/* ===== NOTIFICATION TOAST ===== */
+#toast {
+  position: fixed;
+  bottom: 40px;
+  right: 20px;
+  background: var(--bg-panel);
+  border: 1px solid var(--green);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  color: var(--green);
+  font-size: 12px;
+  z-index: 2000;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all 0.3s;
+  box-shadow: var(--glow-green);
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+
+/* ===== Greenhouse SVG styles ===== */
+.gh-svg { width: 100%; height: auto; }
+.gh-wall { fill: #1a2840; stroke: #2a4070; stroke-width: 1.5; }
+.gh-roof { fill: #0d1829; stroke: #2a4070; stroke-width: 1.5; }
+.gh-glass { fill: rgba(0,170,255,0.08); stroke: #00aaff; stroke-width: 1; }
+.gh-aluminet { fill: rgba(180,180,180,0.3); stroke: #aaa; stroke-width: 1; transition: all 0.5s; }
+.gh-wet-wall { fill: #0a2040; stroke: #0066aa; stroke-width: 1.5; }
+.gh-wet-wall.active { fill: rgba(0,100,200,0.4); stroke: #00aaff; }
+.gh-exhaust { fill: #1a2840; stroke: #888; stroke-width: 1; }
+.gh-heater { fill: #1a1a0a; stroke: #885500; stroke-width: 1; }
+.gh-heater.active { fill: rgba(200,80,0,0.3); stroke: var(--orange); }
+.gh-window { fill: rgba(0,170,255,0.12); stroke: #00aaff; stroke-width: 1; transition: all 0.5s; }
+.gh-temp-bg { fill: none; }
+.air-arrow { stroke-width: 1.5; marker-end: url(#arrowhead); fill: none; opacity: 0.7; }
+.fan-blade { transform-origin: center; }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<div id="header">
+  <span class="header-icon"><i class="fas fa-seedling"></i></span>
+  <div class="header-title">
+    GreenHouse — Fuzzy MIMO Simulator
+    <span class="sub1">Controle Fuzzy MIMO para Casa de Vegetação &nbsp;|&nbsp;
+      <span style="color:var(--cyan)">Mestrando: JucemarFC (UFSC)</span> &nbsp;|&nbsp;
+      <span style="color:var(--green-dim)">Orientador: Prof. Dr. Roderval M.</span>
+    </span>
+  </div>
+  <div class="header-status">
+    <div class="status-item">
+      <div class="status-dot" id="sim-dot"></div>
+      <span id="sim-status-text">PARADO</span>
+    </div>
+    <div class="status-item">
+      <i class="fas fa-microchip" style="color:var(--text-muted)"></i>
+      <span>Motor Fuzzy: <span id="fuzzy-ms" style="color:var(--cyan);font-family:var(--font-mono)">--ms</span></span>
+    </div>
+    <div class="status-item">
+      <i class="fas fa-bolt" style="color:var(--yellow)"></i>
+      <span id="header-power" style="font-family:var(--font-mono);color:var(--yellow)">0 W</span>
+    </div>
+    <div class="sim-time-display">⏱ <span id="sim-time">00:00:00</span></div>
+    <span id="clock"></span>
+  </div>
+</div>
+
+<!-- ===== MAIN APP ===== -->
+<div id="app">
+
+  <!-- ===== LEFT COLUMN ===== -->
+  <div id="left-column">
+
+    <!-- PAINEL 1: CONFIGURAÇÃO -->
+    <div class="panel" id="panel-config">
+      <div class="panel-header">
+        <i class="fas fa-sliders-h panel-icon"></i>
+        <h3>Configuração & Cenário</h3>
+        <span class="panel-badge badge-green">MIMO</span>
+      </div>
+      <div class="panel-body">
+
+        <!-- Dimensões -->
+        <div class="form-section">
+          <div class="form-section-title"><i class="fas fa-ruler-combined"></i> Dimensões da Estufa</div>
+          <div class="input-row input-row-3">
+            <div class="input-group">
+              <div class="input-label">Largura <span class="input-value" id="lbl-width">8m</span></div>
+              <input type="number" id="inp-width" value="8" min="2" max="50" step="0.5" oninput="updateDimensions()">
+            </div>
+            <div class="input-group">
+              <div class="input-label">Comprimento <span class="input-value" id="lbl-length">14m</span></div>
+              <input type="number" id="inp-length" value="14" min="2" max="100" step="0.5" oninput="updateDimensions()">
+            </div>
+            <div class="input-group">
+              <div class="input-label">Altura <span class="input-value" id="lbl-height">6m</span></div>
+              <input type="number" id="inp-height" value="6" min="2" max="20" step="0.5" oninput="updateDimensions()">
+            </div>
+          </div>
+          <div style="text-align:right;font-family:var(--font-mono);font-size:10px;color:var(--cyan)">
+            Volume: <span id="volume-display">672</span> m³ &nbsp;|&nbsp; Massa de Ar: <span id="mass-display">806</span> kg
+          </div>
+        </div>
+
+        <!-- Cenários pré-definidos -->
+        <div class="form-section">
+          <div class="form-section-title"><i class="fas fa-database"></i> Cenários Pré-definidos</div>
+          <select id="scenario-select" onchange="loadScenario()">
+            <option value="custom">— Personalizado —</option>
+            <option value="summer">🌞 Verão Intenso — TI=38 TE=35 VV=2 SP=25</option>
+            <option value="warm_dry">🌤️ Dia Quente Seco — TI=34 TE=28 VV=3 SP=25</option>
+            <option value="winter_night">🌙 Noite de Inverno — TI=8 TE=3 VV=5 SP=18</option>
+            <option value="spring_morning">🌱 Manhã Primavera — TI=22 TE=18 VV=4 SP=22</option>
+            <option value="storm">⛈ Tempestade — TI=20 TE=15 VV=13 SP=20</option>
+            <option value="cloudy_cold">☁ Dia Nublado Frio — TI=12 TE=8 VV=6 SP=20</option>
+            <option value="hot_wind">💨 Calor com Vento — TI=32 TE=28 VV=10 SP=25</option>
+            <option value="warm_night">🌃 Noite Quente — TI=30 TE=25 VV=3 SP=26</option>
+          </select>
+        </div>
+
+        <!-- Parâmetros de Entrada -->
+        <div class="form-section">
+          <div class="form-section-title"><i class="fas fa-thermometer-half"></i> Variáveis de Entrada</div>
+
+          <div class="input-group" style="margin-bottom:7px">
+            <div class="input-label">
+              Temp. Interna (TI) — Sensor Estufa
+              <span class="input-value" id="lbl-ti">25.0°C</span>
+            </div>
+            <input type="range" id="slider-ti" min="0" max="50" step="0.1" value="25" oninput="updateSlider('ti', this.value)">
+          </div>
+
+          <div class="input-group" style="margin-bottom:7px">
+            <div class="input-label">
+              Temp. Externa (TE) — Estação Meteo.
+              <span class="input-value" id="lbl-te">20.0°C</span>
+            </div>
+            <input type="range" id="slider-te" min="-5" max="45" step="0.1" value="20" oninput="updateSlider('te', this.value)">
+          </div>
+
+          <div class="input-group" style="margin-bottom:7px">
+            <div class="input-label">
+              Velocidade do Vento (VV) — Anemômetro
+              <span class="input-value" id="lbl-vv">3.0 m/s</span>
+            </div>
+            <input type="range" id="slider-vv" min="0" max="15" step="0.1" value="3" oninput="updateSlider('vv', this.value)">
+          </div>
+
+          <div class="input-group" style="margin-bottom:7px">
+            <div class="input-label">
+              Setpoint (SP) — Temperatura Desejada
+              <span class="input-value" id="lbl-sp" style="color:var(--cyan)">22.0°C</span>
+            </div>
+            <input type="range" id="slider-sp" min="15" max="35" step="0.1" value="22" oninput="updateSlider('sp', this.value)">
+          </div>
+        </div>
+
+        <!-- Controles Simulação -->
+        <div class="form-section">
+          <div class="form-section-title"><i class="fas fa-play-circle"></i> Controle da Simulação</div>
+          <div class="btn-row">
+            <button class="btn btn-green" id="btn-start" onclick="startSimulation()">
+              <i class="fas fa-play"></i> Iniciar
+            </button>
+            <button class="btn btn-yellow" id="btn-pause" onclick="pauseSimulation()" disabled>
+              <i class="fas fa-pause"></i> Pausar
+            </button>
+            <button class="btn btn-red" id="btn-reset" onclick="resetSimulation()">
+              <i class="fas fa-undo"></i> Reset
+            </button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+            <span style="font-size:10px;color:var(--text-muted)">Velocidade:</span>
+            <div class="speed-group" id="speed-group">
+              <button class="speed-btn active" onclick="setSpeed(1,this)">1×</button>
+              <button class="speed-btn" onclick="setSpeed(2,this)">2×</button>
+              <button class="speed-btn" onclick="setSpeed(5,this)">5×</button>
+              <button class="speed-btn" onclick="setSpeed(10,this)">10×</button>
+            </div>
+            <div style="flex:1"></div>
+            <span class="panel-badge badge-blue" id="speed-badge">1×</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PAINEL 2: LOG DE AÇÕES -->
+    <div class="panel" id="panel-log" style="flex:1;min-height:0">
+      <div class="panel-header">
+        <i class="fas fa-terminal panel-icon"></i>
+        <h3>Log de Ações Fuzzy</h3>
+        <span class="panel-badge badge-blue" id="log-count-badge">0 eventos</span>
+        <button class="btn btn-red btn-sm" onclick="clearLog()" style="margin-left:4px">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+      <div class="panel-body" id="log-body">
+        <div class="rules-active-bar">
+          <span class="rules-label">Regras Ativas:</span>
+          <span class="rules-badge" id="rules-count">0</span>
+          <div class="rules-list" id="rules-list"></div>
+        </div>
+        <div id="log-container">
+          <div class="log-entry info">
+            <span class="log-time">[--:--:--]</span>
+            <span class="log-msg">🌿 Sistema pronto. Configure os parâmetros e pressione <strong>Iniciar</strong>.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAINEL 3: EXPORTAR RELATÓRIOS -->
+    <div class="panel" id="panel-export">
+      <div class="panel-header">
+        <i class="fas fa-file-export panel-icon"></i>
+        <h3>Exportar Relatórios</h3>
+        <span class="panel-badge badge-green">4 formatos</span>
+      </div>
+      <div class="panel-body" style="padding:8px">
+        <div style="font-size:9px;color:var(--text-muted);margin-bottom:7px;text-align:center">
+          Salve os resultados da simulação nos formatos abaixo
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+          <button class="btn btn-red" onclick="exportPDF()" style="flex-direction:column;padding:8px 4px;gap:3px">
+            <i class="fas fa-file-pdf" style="font-size:16px"></i>
+            <span style="font-size:10px">PDF</span>
+            <span style="font-size:8px;opacity:0.7">Relatório completo</span>
+          </button>
+          <button class="btn btn-green" onclick="exportJSON()" style="flex-direction:column;padding:8px 4px;gap:3px">
+            <i class="fas fa-file-code" style="font-size:16px"></i>
+            <span style="font-size:10px">JSON</span>
+            <span style="font-size:8px;opacity:0.7">Cenário completo</span>
+          </button>
+          <button class="btn btn-blue" onclick="exportCSV()" style="flex-direction:column;padding:8px 4px;gap:3px">
+            <i class="fas fa-table" style="font-size:16px"></i>
+            <span style="font-size:10px">CSV</span>
+            <span style="font-size:8px;opacity:0.7">Dados brutos</span>
+          </button>
+          <button class="btn btn-yellow" onclick="window.print()" style="flex-direction:column;padding:8px 4px;gap:3px">
+            <i class="fas fa-print" style="font-size:16px"></i>
+            <span style="font-size:10px">Imprimir</span>
+            <span style="font-size:8px;opacity:0.7">Tela atual</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end left-column -->
+
+  <!-- ===== RIGHT COLUMN ===== -->
+  <div id="right-column">
+
+    <!-- BARRA SUPERIOR: TEMP + ATUADORES em 2 colunas -->
+    <div id="top-bar-combined" style="display:flex;gap:6px;flex-shrink:0">
+
+      <!-- COLUNA ESQUERDA: Leituras de sensores -->
+      <div id="sensors-col" style="display:flex;flex-direction:column;gap:4px;min-width:0;flex:0 0 auto;width:220px">
+        <!-- TI -->
+        <div class="mini-sensor-card" id="sc-ti">
+          <div class="msc-left">
+            <span class="msc-icon">🌡️</span>
+            <div>
+              <div class="msc-label">Temp. Interna</div>
+              <div class="msc-trend" id="trend-ti">▶ estável</div>
+            </div>
+          </div>
+          <div class="msc-value ok" id="disp-ti">25.0<span class="msc-unit">°C</span></div>
+        </div>
+        <!-- TE -->
+        <div class="mini-sensor-card" id="sc-te">
+          <div class="msc-left">
+            <span class="msc-icon">🌤️</span>
+            <div>
+              <div class="msc-label">Temp. Externa</div>
+              <div class="msc-trend" id="trend-te">▶ estável</div>
+            </div>
+          </div>
+          <div class="msc-value cool" id="disp-te">20.0<span class="msc-unit">°C</span></div>
+        </div>
+        <!-- VV -->
+        <div class="mini-sensor-card" id="sc-vv">
+          <div class="msc-left">
+            <span class="msc-icon">💨</span>
+            <div>
+              <div class="msc-label">Vel. Vento</div>
+              <div class="msc-trend" id="trend-vv">▶ Leve</div>
+            </div>
+          </div>
+          <div class="msc-value ok" id="disp-vv">3.0<span class="msc-unit"> m/s</span></div>
+        </div>
+        <!-- SP + Erro -->
+        <div class="mini-sensor-card" style="border-color:#00eeff22">
+          <div class="msc-left">
+            <span class="msc-icon">🎯</span>
+            <div>
+              <div class="msc-label">Setpoint</div>
+              <div style="font-size:9px;color:var(--text-muted)">Erro: <span id="disp-erro" style="font-family:var(--font-mono);color:var(--yellow)">+3.0°C</span></div>
+            </div>
+          </div>
+          <div class="msc-value" id="disp-sp" style="color:var(--cyan)">22.0<span class="msc-unit">°C</span></div>
+        </div>
+        <!-- Potência -->
+        <div class="mini-sensor-card" style="border-color:#ff880022">
+          <div class="msc-left">
+            <span class="msc-icon">⚡</span>
+            <div>
+              <div class="msc-label">Potência Total</div>
+              <div style="font-size:9px;color:var(--text-muted)">Acum: <span id="disp-energy" style="font-family:var(--font-mono);color:var(--yellow)">0.000 kWh</span></div>
+            </div>
+          </div>
+          <div class="msc-value" id="disp-power" style="color:var(--orange)">0<span class="msc-unit"> W</span></div>
+        </div>
+      </div>
+
+      <!-- COLUNA DIREITA: Acionadores -->
+      <div id="actuators-col" style="flex:1;min-width:0">
+        <div class="actuator-grid-compact" id="actuator-grid">
+          <!-- Bomba -->
+          <div class="act-card-mini" id="act-bomba">
+            <div class="acm-header">
+              <span>💧</span>
+              <span class="acm-name">Bomba</span>
+              <span class="acm-val" id="act-bomba-v">OFF</span>
+            </div>
+            <div class="act-bar"><div class="act-bar-fill" id="act-bomba-bar" style="width:0%;background:var(--blue)"></div></div>
+            <div class="acm-detail" id="act-bomba-d">0s ON | 0 L/h</div>
+          </div>
+          <!-- Exaustores -->
+          <div class="act-card-mini" id="act-exaustor">
+            <div class="acm-header">
+              <span>🌀</span>
+              <span class="acm-name">Exaustores ×2</span>
+              <span class="acm-val" id="act-exaustor-v">OFF</span>
+            </div>
+            <div class="act-bar"><div class="act-bar-fill" id="act-exaustor-bar" style="width:0%;background:var(--cyan)"></div></div>
+            <div class="acm-detail" id="act-exaustor-d">0% | 0W</div>
+          </div>
+          <!-- Aquecedores -->
+          <div class="act-card-mini" id="act-aquecedor">
+            <div class="acm-header">
+              <span>🔥</span>
+              <span class="acm-name">Aquecedores ×4</span>
+              <span class="acm-val" id="act-aquecedor-v">EST.0</span>
+            </div>
+            <div class="act-bar"><div class="act-bar-fill" id="act-aquecedor-bar" style="width:0%;background:var(--orange)"></div></div>
+            <div class="acm-detail" id="act-aquecedor-d">0/4 ativos | 0W</div>
+          </div>
+          <!-- Aluminet -->
+          <div class="act-card-mini" id="act-aluminet">
+            <div class="acm-header">
+              <span>☀️</span>
+              <span class="acm-name">Aluminet</span>
+              <span class="acm-val" id="act-aluminet-v">ABERTO</span>
+            </div>
+            <div class="act-bar"><div class="act-bar-fill" id="act-aluminet-bar" style="width:0%;background:var(--yellow)"></div></div>
+            <div class="acm-detail" id="act-aluminet-d">Bloqueio: 0%</div>
+          </div>
+          <!-- Janelas Sup -->
+          <div class="act-card-mini" id="act-jan-sup">
+            <div class="acm-header">
+              <span>🪟</span>
+              <span class="acm-name">Jan. Sup. ×2</span>
+              <span class="acm-val" id="act-jan-sup-v">FECH.</span>
+            </div>
+            <div class="act-bar"><div class="act-bar-fill" id="act-jan-sup-bar" style="width:0%;background:var(--green)"></div></div>
+            <div class="acm-detail" id="act-jan-sup-d">Ventilação: 0%</div>
+          </div>
+          <!-- Janelas Laterais -->
+          <div class="act-card-mini" id="act-jan-lat">
+            <div class="acm-header">
+              <span>🏗️</span>
+              <span class="acm-name">Jan. Lat. E/D</span>
+              <span class="acm-val" id="act-jan-lat-v">0%</span>
+            </div>
+            <div class="act-bar"><div class="act-bar-fill" id="act-jan-lat-bar" style="width:0%;background:var(--green)"></div></div>
+            <div class="acm-detail" id="act-jan-lat-d">FECHADO | parado</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- end top-bar-combined -->
+
+    <!-- PAINEL 3: VISUALIZAÇÃO -->
+    <div class="panel" id="panel-viz" style="flex:1;min-height:0">
+      <div class="tab-header">
+        <div class="tab-btn active" onclick="switchTab('charts')" id="tab-charts">
+          <i class="fas fa-chart-line"></i> Gráficos
+        </div>
+        <div class="tab-btn" onclick="switchTab('greenhouse')" id="tab-greenhouse">
+          <i class="fas fa-leaf"></i> Estufa Visual
+        </div>
+        <div class="tab-btn" onclick="switchTab('mf')" id="tab-mf">
+          <i class="fas fa-wave-square"></i> Funções Pertinência
+        </div>
+        <div class="tab-btn" onclick="switchTab('anfis')" id="tab-anfis">
+          <i class="fas fa-brain"></i> ANFIS / Aprendizado
+        </div>
+      </div>
+
+      <!-- Tab Gráficos -->
+      <div class="tab-content active" id="tab-content-charts" style="overflow-y:auto">
+        <div class="chart-container" style="height:220px">
+          <div class="chart-title"><i class="fas fa-thermometer"></i> Temperaturas & Setpoint em Tempo Real</div>
+          <canvas id="chart-temp" style="height:175px!important"></canvas>
+        </div>
+        <div class="charts-grid">
+          <div class="chart-container" style="height:180px">
+            <div class="chart-title"><i class="fas fa-sliders-h"></i> Estado dos Acionadores (%)</div>
+            <canvas id="chart-actuators" style="height:140px!important"></canvas>
+          </div>
+          <div class="chart-container" style="height:180px">
+            <div class="chart-title"><i class="fas fa-bolt"></i> Consumo Energético (W)</div>
+            <canvas id="chart-power" style="height:140px!important"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Estufa Visual -->
+      <div class="tab-content" id="tab-content-greenhouse">
+        <div id="greenhouse-container">
+          <div class="chart-title" style="text-align:center"><i class="fas fa-leaf"></i> Visualização 2D da Estufa — Vista Frontal & Lateral</div>
+          <div class="gh-views">
+            <div>
+              <div class="gh-view-title">Vista Frontal (Entrada de Ar)</div>
+              <svg id="gh-front" viewBox="0 0 300 200" class="gh-svg">
+                <defs>
+                  <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+                    <polygon points="0 0, 6 2, 0 4" fill="#00aaff" opacity="0.7"/>
+                  </marker>
+                  <marker id="arrowhead-red" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+                    <polygon points="0 0, 6 2, 0 4" fill="#ff3355" opacity="0.7"/>
+                  </marker>
+                  <linearGradient id="tempGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop id="grad-stop1" offset="0%" stop-color="#ff3355" stop-opacity="0.1"/>
+                    <stop id="grad-stop2" offset="100%" stop-color="#00aaff" stop-opacity="0.1"/>
+                  </linearGradient>
+                  <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#0a1520" stop-opacity="1"/>
+                    <stop offset="100%" stop-color="#0d1f35" stop-opacity="1"/>
+                  </linearGradient>
+                </defs>
+                <!-- Sky -->
+                <rect x="0" y="0" width="300" height="200" fill="url(#skyGrad)"/>
+                <!-- Ground -->
+                <rect x="0" y="170" width="300" height="30" fill="#0a1510"/>
+                <rect x="0" y="168" width="300" height="3" fill="#1a3520"/>
+                <!-- Greenhouse body -->
+                <rect id="gh-body" x="40" y="80" width="220" height="90" class="gh-wall"/>
+                <!-- Temperature gradient overlay -->
+                <rect x="40" y="80" width="220" height="90" fill="url(#tempGrad)" id="temp-overlay"/>
+                <!-- Roof -->
+                <polygon id="gh-roof" points="40,80 150,30 260,80" class="gh-roof"/>
+                <!-- Roof glass panels -->
+                <polygon points="40,80 150,30 150,80" class="gh-glass" opacity="0.5"/>
+                <polygon points="150,30 260,80 150,80" class="gh-glass" opacity="0.5"/>
+                <!-- Aluminet -->
+                <rect id="aluminet-front" x="42" y="82" width="216" height="8" class="gh-aluminet" rx="2"/>
+                <!-- Wet wall (left) -->
+                <rect id="wet-wall" x="40" y="80" width="12" height="90" class="gh-wet-wall" rx="1"/>
+                <text x="46" y="130" font-size="8" fill="#00aaff" text-anchor="middle" transform="rotate(-90,46,130)">PAREDE HÚMIDA</text>
+                <!-- Exhaust fans (right) -->
+                <circle id="exh1" cx="248" cy="105" r="12" class="gh-exhaust"/>
+                <g id="fan1" transform="translate(248,105)">
+                  <line x1="0" y1="-9" x2="0" y2="9" stroke="#888" stroke-width="2"/>
+                  <line x1="-9" y1="0" x2="9" y2="0" stroke="#888" stroke-width="2"/>
+                  <line x1="-6" y1="-6" x2="6" y2="6" stroke="#888" stroke-width="1.5"/>
+                  <line x1="6" y1="-6" x2="-6" y2="6" stroke="#888" stroke-width="1.5"/>
+                </g>
+                <circle id="exh2" cx="248" cy="140" r="12" class="gh-exhaust"/>
+                <g id="fan2" transform="translate(248,140)">
+                  <line x1="0" y1="-9" x2="0" y2="9" stroke="#888" stroke-width="2"/>
+                  <line x1="-9" y1="0" x2="9" y2="0" stroke="#888" stroke-width="2"/>
+                  <line x1="-6" y1="-6" x2="6" y2="6" stroke="#888" stroke-width="1.5"/>
+                  <line x1="6" y1="-6" x2="-6" y2="6" stroke="#888" stroke-width="1.5"/>
+                </g>
+                <!-- Lateral windows (left/right) - shown as sliders -->
+                <rect id="win-lat-l" x="40" y="110" width="8" height="30" class="gh-window"/>
+                <rect id="win-lat-r" x="252" y="110" width="8" height="30" class="gh-window"/>
+                <!-- Top windows -->
+                <rect id="win-top-l" x="80" y="30" width="30" height="8" class="gh-window" transform="rotate(-30,80,30)"/>
+                <rect id="win-top-r" x="175" y="30" width="30" height="8" class="gh-window" transform="rotate(30,175,30)"/>
+                <!-- Heaters (bottom) -->
+                <rect id="heat1" x="60" y="155" width="20" height="8" class="gh-heater" rx="2"/>
+                <rect id="heat2" x="95" y="155" width="20" height="8" class="gh-heater" rx="2"/>
+                <rect id="heat3" x="165" y="155" width="20" height="8" class="gh-heater" rx="2"/>
+                <rect id="heat4" x="200" y="155" width="20" height="8" class="gh-heater" rx="2"/>
+                <!-- Air flow arrows -->
+                <g id="airflow-cooling" opacity="0">
+                  <path d="M 60,125 Q 100,120 140,125" stroke="#00aaff" class="air-arrow"/>
+                  <path d="M 60,135 Q 100,130 140,135" stroke="#00aaff" class="air-arrow"/>
+                  <path d="M 140,125 Q 190,120 235,125" stroke="#00aaff" class="air-arrow"/>
+                </g>
+                <g id="airflow-heat" opacity="0">
+                  <path d="M 70,152 Q 70,140 80,130" stroke="#ff8800" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-red)" opacity="0.6"/>
+                  <path d="M 105,152 Q 105,140 115,130" stroke="#ff8800" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-red)" opacity="0.6"/>
+                  <path d="M 175,152 Q 175,140 185,130" stroke="#ff8800" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-red)" opacity="0.6"/>
+                  <path d="M 210,152 Q 210,140 220,130" stroke="#ff8800" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-red)" opacity="0.6"/>
+                </g>
+                <!-- Temperature text -->
+                <text id="gh-temp-text" x="150" y="128" font-size="18" fill="white" text-anchor="middle" font-weight="bold" opacity="0.7">25.0°C</text>
+                <text x="150" y="144" font-size="8" fill="#7090b0" text-anchor="middle">SP: 22.0°C</text>
+                <!-- Wind arrows (external) -->
+                <g id="wind-arrows" opacity="0.5">
+                  <path d="M 5,100 L 35,100" stroke="#7090b0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+                  <path d="M 5,120 L 35,120" stroke="#7090b0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+                  <path d="M 5,140 L 35,140" stroke="#7090b0" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+                </g>
+                <text x="12" y="95" font-size="7" fill="#7090b0">vento</text>
+              </svg>
+            </div>
+            <div>
+              <div class="gh-view-title">Vista Lateral (Corte Transversal)</div>
+              <svg id="gh-side" viewBox="0 0 300 200" class="gh-svg">
+                <defs>
+                  <linearGradient id="skyGrad2" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#0a1520"/>
+                    <stop offset="100%" stop-color="#0d1f35"/>
+                  </linearGradient>
+                </defs>
+                <rect x="0" y="0" width="300" height="200" fill="url(#skyGrad2)"/>
+                <rect x="0" y="170" width="300" height="30" fill="#0a1510"/>
+                <rect x="0" y="168" width="300" height="3" fill="#1a3520"/>
+                <!-- Side walls -->
+                <rect x="30" y="80" width="240" height="90" class="gh-wall"/>
+                <!-- Side roof -->
+                <rect x="28" y="75" width="244" height="8" fill="#1a3040" stroke="#2a4070" stroke-width="1"/>
+                <!-- Aluminet side view -->
+                <rect id="aluminet-side" x="32" y="83" width="236" height="8" class="gh-aluminet" rx="2"/>
+                <!-- Plants (decorative) -->
+                <g opacity="0.5">
+                  <rect x="60" y="148" width="6" height="20" fill="#1a3520"/>
+                  <ellipse cx="63" cy="143" rx="10" ry="7" fill="#1a4020"/>
+                  <rect x="110" y="145" width="6" height="23" fill="#1a3520"/>
+                  <ellipse cx="113" cy="140" rx="12" ry="8" fill="#1a4a20"/>
+                  <rect x="165" y="147" width="6" height="21" fill="#1a3520"/>
+                  <ellipse cx="168" cy="143" rx="10" ry="7" fill="#1a3a20"/>
+                  <rect x="215" y="148" width="6" height="20" fill="#1a3520"/>
+                  <ellipse cx="218" cy="143" rx="9" ry="6" fill="#1a4020"/>
+                </g>
+                <!-- Heaters side view -->
+                <rect id="heat-side1" x="45" y="158" width="30" height="7" class="gh-heater" rx="2"/>
+                <rect id="heat-side2" x="85" y="158" width="30" height="7" class="gh-heater" rx="2"/>
+                <rect id="heat-side3" x="165" y="158" width="30" height="7" class="gh-heater" rx="2"/>
+                <rect id="heat-side4" x="205" y="158" width="30" height="7" class="gh-heater" rx="2"/>
+                <!-- Wet wall label -->
+                <rect x="30" y="80" width="10" height="90" fill="#0a2040" stroke="#0066aa" stroke-width="1"/>
+                <text x="35" y="130" font-size="7" fill="#00aaff" text-anchor="middle" transform="rotate(-90,35,130)">PAREDE HÚMIDA</text>
+                <!-- Top windows side -->
+                <rect id="win-top-side" x="100" y="74" width="100" height="8" fill="rgba(0,170,255,0.15)" stroke="#00aaff" stroke-width="1"/>
+                <!-- Dimension labels -->
+                <text x="150" y="195" font-size="8" fill="#405070" text-anchor="middle">← 14m →</text>
+                <line x1="30" y1="190" x2="270" y2="190" stroke="#405070" stroke-width="0.5"/>
+                <line x1="30" y1="187" x2="30" y2="193" stroke="#405070" stroke-width="0.5"/>
+                <line x1="270" y1="187" x2="270" y2="193" stroke="#405070" stroke-width="0.5"/>
+                <!-- Height marker -->
+                <line x1="20" y1="80" x2="20" y2="168" stroke="#405070" stroke-width="0.5"/>
+                <text x="14" y="128" font-size="7" fill="#405070" text-anchor="middle" transform="rotate(-90,14,128)">6m</text>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Funções de Pertinência -->
+      <div class="tab-content" id="tab-content-mf" style="overflow-y:auto">
+        <div id="mf-container">
+          <div class="mf-card">
+            <div class="mf-title">Temp. Interna (TI) — 0 a 50°C</div>
+            <canvas id="mf-ti" height="100"></canvas>
+          </div>
+          <div class="mf-card">
+            <div class="mf-title">Temp. Externa (TE) — -5 a 45°C</div>
+            <canvas id="mf-te" height="100"></canvas>
+          </div>
+          <div class="mf-card">
+            <div class="mf-title">Velocidade do Vento (VV) — 0 a 15 m/s</div>
+            <canvas id="mf-vv" height="100"></canvas>
+          </div>
+          <div class="mf-card">
+            <div class="mf-title">Erro (E = SP - TI) — -20 a 20°C</div>
+            <canvas id="mf-erro" height="100"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab ANFIS -->
+      <div class="tab-content" id="tab-content-anfis" style="overflow-y:auto">
+        <div class="anfis-grid">
+          <div>
+            <div class="chart-title"><i class="fas fa-brain"></i> Convergência ANFIS</div>
+            <div class="chart-container" style="height:200px">
+              <canvas id="chart-anfis" style="height:160px!important"></canvas>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <button class="btn btn-purple" onclick="trainANFIS()">
+                <i class="fas fa-play"></i> Treinar ANFIS
+              </button>
+              <button class="btn btn-green" onclick="saveScenario()">
+                <i class="fas fa-save"></i> Registrar Cenário
+              </button>
+            </div>
+            <div style="margin-top:8px;padding:8px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius)">
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:5px">
+                <span style="color:var(--text-muted)">Regras Especialistas:</span>
+                <span style="font-family:var(--font-mono);color:var(--yellow)">35</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:5px">
+                <span style="color:var(--text-muted)">Regras Aprendidas ANFIS:</span>
+                <span style="font-family:var(--font-mono);color:var(--purple)" id="anfis-rules">0</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:5px">
+                <span style="color:var(--text-muted)">Tempo Inferência (Fuzzy puro):</span>
+                <span style="font-family:var(--font-mono);color:var(--red)" id="anfis-time-base">~85ms</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10px">
+                <span style="color:var(--text-muted)">Tempo Inferência (ANFIS):</span>
+                <span style="font-family:var(--font-mono);color:var(--green)" id="anfis-time-opt">--ms</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="chart-title"><i class="fas fa-database"></i> Cenários Gravados</div>
+            <div class="table-wrap" style="max-height:280px;overflow-y:auto">
+              <table class="anfis-table" id="anfis-scenarios-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>TI</th>
+                    <th>TE</th>
+                    <th>VV</th>
+                    <th>SP</th>
+                    <th>t(s)</th>
+                    <th>kWh</th>
+                  </tr>
+                </thead>
+                <tbody id="anfis-tbody">
+                  <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:12px">Nenhum cenário registrado</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end panel-viz -->
+
+    <!-- PAINEL 4: RESULTADOS -->
+    <div class="panel" id="panel-results" style="flex:0 0 auto">
+      <div class="panel-header">
+        <i class="fas fa-chart-bar panel-icon"></i>
+        <h3>Resultados & Análise</h3>
+        <span class="panel-badge badge-orange" id="ods-badge">ODS: --</span>
+      </div>
+      <div class="panel-body" style="padding:7px">
+
+        <!-- Layout 3 colunas: Performance | ODS | Comparativo -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
+
+          <!-- PERFORMANCE -->
+          <div>
+            <div class="res-section-title"><i class="fas fa-tachometer-alt"></i> Performance</div>
+            <div class="res-metrics">
+              <div class="res-metric">
+                <span class="res-met-lbl">⏱ Tempo SP</span>
+                <span class="res-met-val" id="met-time">--</span>
+                <span class="res-met-unit">min</span>
+              </div>
+              <div class="res-metric">
+                <span class="res-met-lbl">📈 Overshoot</span>
+                <span class="res-met-val warn" id="met-overshoot">0.0</span>
+                <span class="res-met-unit">°C</span>
+              </div>
+              <div class="res-metric">
+                <span class="res-met-lbl">📉 MAE</span>
+                <span class="res-met-val blue" id="met-mae">0.00</span>
+                <span class="res-met-unit">°C</span>
+              </div>
+              <div class="res-metric">
+                <span class="res-met-lbl">📊 RMSE</span>
+                <span class="res-met-val blue" id="met-rmse">0.00</span>
+                <span class="res-met-unit">°C</span>
+              </div>
+              <div class="res-metric">
+                <span class="res-met-lbl">🎯 Estab.</span>
+                <span class="res-met-val" id="met-stability">--</span>
+                <span class="res-met-unit">%</span>
+              </div>
+              <div class="res-metric">
+                <span class="res-met-lbl">⚙️ Regras</span>
+                <span class="res-met-val orange" id="met-rules">0</span>
+                <span class="res-met-unit">ativ.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ODS -->
+          <div>
+            <div class="res-section-title"><i class="fas fa-leaf"></i> Eficiência (ODS)</div>
+            <div class="res-metrics">
+              <div class="res-metric">
+                <span class="res-met-lbl">⚡ Consumo</span>
+                <span class="res-met-val" id="ods-kwh" style="font-size:10px">0.000</span>
+                <span class="res-met-unit">kWh</span>
+              </div>
+              <div class="res-metric">
+                <span class="res-met-lbl">💧 Água</span>
+                <span class="res-met-val blue" id="ods-water">0.0</span>
+                <span class="res-met-unit">L</span>
+              </div>
+              <div class="res-metric">
+                <span class="res-met-lbl">🌿 CO₂</span>
+                <span class="res-met-val" id="ods-co2" style="font-size:10px">0.000</span>
+                <span class="res-met-unit">kg</span>
+              </div>
+              <div class="res-metric">
+                <span class="res-met-lbl">💰 Econ.</span>
+                <span class="res-met-val" id="ods-economy">0.0</span>
+                <span class="res-met-unit">%</span>
+              </div>
+            </div>
+            <div style="margin-top:5px">
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-bottom:3px">
+                <span>🏅 Índice ODS</span>
+                <span id="ods-index" style="color:var(--green);font-family:var(--font-mono);font-weight:700">0%</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill green" id="ods-bar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COMPARATIVO -->
+          <div>
+            <div class="res-section-title"><i class="fas fa-balance-scale"></i> Comparativo</div>
+            <table class="cmp-table-mini">
+              <thead>
+                <tr><th>Método</th><th>t(min)</th><th>kWh</th><th>Est%</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="color:var(--green)">Fuzzy+TP</td>
+                  <td id="cmp-fuzzy-time">--</td>
+                  <td id="cmp-fuzzy-kwh">--</td>
+                  <td id="cmp-fuzzy-stab">--</td>
+                </tr>
+                <tr>
+                  <td style="color:var(--purple)">ANFIS</td>
+                  <td id="cmp-anfis-time">--</td>
+                  <td id="cmp-anfis-kwh">--</td>
+                  <td id="cmp-anfis-stab">--</td>
+                </tr>
+                <tr>
+                  <td style="color:var(--yellow)">ON/OFF</td>
+                  <td id="cmp-onoff-time">--</td>
+                  <td id="cmp-onoff-kwh">--</td>
+                  <td id="cmp-onoff-stab">--</td>
+                </tr>
+              </tbody>
+            </table>
+            <!-- IDs ocultos para compatibilidade com JS -->
+            <span id="cmp-fuzzy-water" style="display:none">--</span>
+            <span id="cmp-anfis-water" style="display:none">--</span>
+            <span id="cmp-onoff-water" style="display:none">--</span>
+          </div>
+
+        </div><!-- end 3-col grid -->
+      </div>
+    </div><!-- end panel-results -->
+
+  </div><!-- end right-column -->
+</div><!-- end app -->
+
+<!-- ===== FOOTER ===== -->
+<div id="footer">
+  <span class="footer-green">🌿 GreenHouse — Fuzzy MIMO Simulator v2.0</span>
+  <span class="footer-sep">|</span>
+  <span>Dissertação de Mestrado — Mestrando: <span style="color:var(--cyan)">JucemarFC</span></span>
+  <span class="footer-sep">|</span>
+  <span>Orientador: <span style="color:var(--green)">Prof. Dr. Roderval M.</span> — UFSC</span>
+  <span class="footer-sep">|</span>
+  <span>Santa Rosa do Sul / SC &nbsp;|&nbsp; Sistema MIMO: Raspberry Pi + Lógica Fuzzy Mamdani</span>
+  <span class="footer-sep">|</span>
+  <span id="footer-volume" class="footer-green">Vol: 672m³</span>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ===== JAVASCRIPT ===== -->
+<script src="js/fuzzy-engine.js"></script>
+<script src="js/simulation.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/export.js"></script>
+<script>
+  // Init on load
+  window.addEventListener('load', () => {
+    initCharts();
+    drawMembershipFunctions();
+    updateDimensions();
+    updateClock();
+    setInterval(updateClock, 1000);
+    updateAllDisplays();
+    updateGreenhouseSVG();
+  });
+</script>
+
+</body>
+</html>

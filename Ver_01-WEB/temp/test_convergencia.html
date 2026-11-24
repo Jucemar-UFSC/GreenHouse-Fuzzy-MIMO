@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Teste de Convergência — Motor Fuzzy</title>
+<style>
+  body { background:#0a0f1e; color:#e0e0e0; font-family: monospace; padding:20px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th { background:#111827; color:#00ff88; padding:6px 10px; text-align:left; }
+  td { padding:4px 10px; border-bottom:1px solid #1f2a3c; }
+  .ok    { color:#00ff88; }
+  .warn  { color:#ffcc00; }
+  .bad   { color:#ff3355; }
+  .sp-band { background:#002a15; }
+  h2 { color:#00ff88; }
+  h3 { color:#00aaff; }
+  .summary { background:#111827; border:1px solid #00ff88; padding:12px; border-radius:6px; margin:16px 0; }
+</style>
+</head>
+<body>
+<h2>🧪 Teste de Convergência — GreenHouse Fuzzy MIMO</h2>
+
+<div id="output"></div>
+
+<script src="../js/fuzzy-engine.js"></script>
+<script>
+// ── Parâmetros físicos (iguais ao simulation.js) ────────────
+const DENSIDADE_AR = 1.2;
+const CP_AR        = 1005;
+const DT_SIMULACAO = 30;
+const W = 8, L = 14, H = 6;
+
+const POTENCIAS = {
+  bomba:370, exaustor:250, aquecedor:1500,
+};
+const BOMBA_L = 2.5;
+
+function calcularNovaTemperatura(state) {
+  const { TI, TE, VV, SP } = state;
+  const vol = W * L * H;
+  const massaAr = vol * DENSIDADE_AR;
+  const dt = DT_SIMULACAO;
+
+  const aluminet_f   = state.aluminet_pct / 100;
+  const bloqueio_alm = aluminet_f * 0.88;
+  let rad = 0;
+  if (TE >= 28) rad = 800;
+  else if (TE >= 20) rad = 450;
+  else if (TE >= 12) rad = 150;
+  const area = W * L;
+  const P_solar = rad * area * (1 - bloqueio_alm) * 0.04;
+
+  const area_env = 2 * (W + L) * H + area;
+  const P_cond = 5.5 * area_env * (TE - TI);
+
+  const { numAtivos } = state.aquecedor_estagio;
+  const P_aq = numAtivos * POTENCIAS.aquecedor;
+
+  const jan_lat_f = Math.min(1, state.jan_lat_atual / 100);
+  const jan_sup_f = state.jan_sup_aberta ? 1.0 : 0.0;
+  const exaust_f  = Math.min(1, state.exaustor_pct / 100);
+  const vento_amp = 1 + Math.min(3.0, VV / 3.5);
+
+  const ach_total = jan_lat_f * 10.0 * vento_amp + jan_sup_f * 5.0 * vento_amp + exaust_f * 20.0;
+  const fluxo_kg_s = ach_total * vol / 3600 * DENSIDADE_AR;
+  const P_vent = fluxo_kg_s * CP_AR * (TI - TE);
+
+  const T_bwb  = TE - (1 - 0.55) * 12;
+  const T_pad  = TE - 0.88 * (TE - T_bwb);
+  const delta_ev = Math.max(0, TI - T_pad);
+  const bomba_f  = state.tp_bomba_ativo ? (state.bomba_pct / 100) : 0;
+  const fluxo_evap_kgs = exaust_f * vol / 3600 * DENSIDADE_AR * 18.0;
+  const P_evap = bomba_f * fluxo_evap_kgs * CP_AR * delta_ev;
+
+  const P_total = P_solar + P_cond + P_aq - P_vent - P_evap;
+  const dT = (P_total * dt) / (massaAr * CP_AR);
+  const dTSat = Math.max(-6, Math.min(6, dT));
+
+  return { novaTI: Math.max(-5, Math.min(65, TI + dTSat)), P_solar, P_cond, P_aq, P_vent, P_evap, P_total, dT:dTSat };
+}
+
+function runTest(label, TI_init, TE, VV, SP, maxTicks=120) {
+  const eng = new FuzzyEngine();
+
+  let state = {
+    TI: TI_init, TE, VV, SP,
+    bomba_pct: 0, exaustor_pct: 0, aquecedor_pct: 0,
+    jan_lat_atual: 0, jan_lat_pct: 0,
+    jan_sup_aberta: false, jan_sup_pct: 0,
+    aluminet_pct: 0,
+    aquecedor_estagio: { numAtivos: 0, estagio: 0, nome: 'DESLIGADO' },
+    tp_bomba_ativo: false,
+    tick: 0
+  };
+
+  const rows = [];
+  let firstSP = null;
+  let stabCount = 0;
+  let stabStart = null;
+
+  for (let i = 0; i < maxTicks; i++) {
+    state.tick = i;
+    const res = eng.computar(state.TI, state.TE, state.VV, state.SP);
+    const s = res.saidas;
+
+    state.bomba_pct     = s.bomba;
+    state.exaustor_pct  = s.exaustor;
+    state.jan_lat_atual = s.jan_lat;
+    state.jan_sup_aberta = s.jan_sup > 40;
+    state.aluminet_pct  = s.aluminet;
+    state.tp_bomba_ativo = s.bomba > 2;
+
+    // Aquecedores
+    const pct = s.aquecedor;
+    if (pct < 5) state.aquecedor_estagio = { numAtivos:0, estagio:0, nome:'OFF' };
+    else if (pct < 28) state.aquecedor_estagio = { numAtivos:1, estagio:1, nome:'EST1' };
+    else if (pct < 53) state.aquecedor_estagio = { numAtivos:2, estagio:2, nome:'EST2' };
+    else if (pct < 78) state.aquecedor_estagio = { numAtivos:3, estagio:3, nome:'EST3' };
+    else state.aquecedor_estagio = { numAtivos:4, estagio:4, nome:'MAX' };
+
+    const phys = calcularNovaTemperatura(state);
+    const TI_prev = state.TI;
+    state.TI = phys.novaTI;
+
+    const erro = state.SP - state.TI;
+    const erroAbs = Math.abs(erro);
+    if (erroAbs <= 0.5 && firstSP === null) {
+      firstSP = i * DT_SIMULACAO;
+    }
+    if (erroAbs <= 0.5) stabCount++;
+    
+    // Gravar a cada 5 ticks para não sobrecarregar
+    if (i < 10 || i % 3 === 0) {
+      rows.push({
+        tick: i, t_sim: i*DT_SIMULACAO,
+        TI: state.TI.toFixed(2),
+        SP,
+        erro: erro.toFixed(3),
+        REF: s.refCrisp.toFixed(1), HEA: s.heaCrisp.toFixed(1),
+        bomba: s.bomba.toFixed(0), exaust: s.exaustor.toFixed(0),
+        aq: s.aquecedor.toFixed(0),
+        jan_lat: state.jan_lat_atual.toFixed(0),
+        P_total: phys.P_total.toFixed(0),
+        dT: phys.dT.toFixed(3),
+        dentro: erroAbs <= 0.5 ? '✅' : (erroAbs <= 1.5 ? '🟡' : '🔴'),
+        regras: res.regrasAtivas.length
+      });
+    }
+  }
+
+  return { label, rows, firstSP, stabCount, maxTicks, finalTI: state.TI, SP };
+}
+
+// ── Executar os 4 cenários principais ──────────────────────
+const testes = [
+  runTest('🌞 Verão Intenso (TI=38 TE=35 VV=2 SP=25)',    38, 35,  2, 25, 600),
+  runTest('🌙 Noite de Inverno (TI=8 TE=3 VV=5 SP=18)',    8,  3,  5, 18, 600),
+  runTest('🌱 Manhã Primavera (TI=22 TE=18 VV=4 SP=22)',  22, 18,  4, 22, 120),
+  runTest('💨 Calor com Vento (TI=32 TE=28 VV=10 SP=24)', 32, 28, 10, 24, 600),
+];
+
+// ── Renderizar ──────────────────────────────────────────────
+let html = '';
+
+testes.forEach(t => {
+  const firstSPStr = t.firstSP !== null
+    ? `${(t.firstSP/60).toFixed(1)} min (${t.firstSP}s)`
+    : '❌ NÃO ATINGIU';
+  const stabPct = (t.stabCount / t.maxTicks * 100).toFixed(1);
+  const finalErro = Math.abs(t.SP - t.finalTI).toFixed(2);
+  const status = t.firstSP !== null && parseFloat(finalErro) <= 0.5 ? '✅ CONVERGIU' : (t.firstSP !== null ? '⚠️ OSCILA' : '❌ FALHOU');
+
+  html += `<h3>${t.label}</h3>`;
+  html += `<div class="summary">
+    Status: <strong>${status}</strong> &nbsp;|&nbsp;
+    1ª vez no SP: <strong>${firstSPStr}</strong> &nbsp;|&nbsp;
+    TI final: <strong>${t.finalTI.toFixed(2)}°C</strong> (SP=${t.SP}) &nbsp;|&nbsp;
+    Erro final: <strong class="${parseFloat(finalErro)<=0.5?'ok':parseFloat(finalErro)<=2?'warn':'bad'}">${finalErro}°C</strong> &nbsp;|&nbsp;
+    Ticks em SP±0.5°C: <strong>${stabPct}%</strong>
+  </div>`;
+
+  html += `<table>
+    <tr><th>Tick</th><th>T.Sim</th><th>TI (°C)</th><th>SP</th><th>Erro</th>
+        <th>REF%</th><th>HEA%</th><th>Bomba%</th><th>Exaust%</th><th>Aq%</th>
+        <th>JanLat%</th><th>P_total(W)</th><th>ΔT°C</th><th>Band</th><th>Regras</th></tr>`;
+
+  t.rows.forEach(r => {
+    const erroN = parseFloat(r.erro);
+    const cls = Math.abs(erroN) <= 0.5 ? 'sp-band' : '';
+    html += `<tr class="${cls}">
+      <td>${r.tick}</td><td>${r.t_sim}s</td>
+      <td class="${Math.abs(erroN)<=0.5?'ok':Math.abs(erroN)<=2?'warn':'bad'}">${r.TI}</td>
+      <td>${r.SP}</td>
+      <td class="${Math.abs(erroN)<=0.5?'ok':Math.abs(erroN)<=2?'warn':'bad'}">${r.erro}</td>
+      <td>${r.REF}</td><td>${r.HEA}</td>
+      <td>${r.bomba}</td><td>${r.exaust}</td><td>${r.aq}</td>
+      <td>${r.jan_lat}</td><td>${r.P_total}</td><td>${r.dT}</td>
+      <td>${r.dentro}</td><td>${r.regras}</td>
+    </tr>`;
+  });
+  html += `</table><br>`;
+});
+
+// ── Diagnóstico detalhado do cenário de verão ──────────────
+const eng_diag = new FuzzyEngine();
+const TI_diag = 38, TE_diag = 35, VV_diag = 2, SP_diag = 25;
+const res_diag = eng_diag.computar(TI_diag, TE_diag, VV_diag, SP_diag);
+
+console.log('=== DIAGNÓSTICO VERÃO TI=38 TE=35 VV=2 SP=25 ===');
+console.log('Erro E =', SP_diag - TI_diag, '(MN = Muito Negativo = muito quente)');
+console.log('Saídas fuzzy:', JSON.stringify(res_diag.saidas));
+console.log('REF crisp =', res_diag.refCrisp.toFixed(2), '| HEA crisp =', res_diag.heaCrisp.toFixed(2));
+console.log('Regras ativas:', res_diag.regrasAtivas.length);
+res_diag.regrasAtivas.slice(0,5).forEach(r => console.log(' -', r.desc, 'força=', r.forca));
+
+// Verificar balanço físico com as saídas geradas
+const s = res_diag.saidas;
+const vol = 8*14*6, DENS=1.2, CP=1005, dt=30;
+const massaAr = vol * DENS;
+const rad = 800, area = 8*14;
+const P_solar = rad * area * (1 - 0) * 0.06;
+const area_env = 2*(8+14)*6 + area;
+const P_cond = 5.5 * area_env * (35 - 38);
+const exaust_f = s.exaustor / 100;
+const jan_lat_f = s.jan_lat / 100;
+const jan_sup_f = s.jan_sup > 40 ? 1 : 0;
+const vento_amp = 1 + Math.min(3.0, 2/3.5);
+const ach = jan_lat_f*10*vento_amp + jan_sup_f*5*vento_amp + exaust_f*20;
+const fluxo_kg = ach * vol/3600 * DENS;
+const P_vent = fluxo_kg * CP * (38-35);
+const T_bwb = 35 - (1-0.55)*12;
+const T_pad = 35 - 0.88*(35-T_bwb);
+const bomba_f = s.bomba > 2 ? s.bomba/100 : 0;
+const fluxo_evap = exaust_f * vol/3600 * DENS * 14.0;
+const P_evap = bomba_f * fluxo_evap * CP * Math.max(0, 38-T_pad);
+
+console.log('=== BALANÇO FÍSICO ===');
+console.log('P_solar =', P_solar.toFixed(0), 'W');
+console.log('P_cond  =', P_cond.toFixed(0), 'W (TI>TE: perde calor)');
+console.log('P_vent  =', P_vent.toFixed(0), 'W');
+console.log('P_evap  =', P_evap.toFixed(0), 'W');
+console.log('Bomba%  =', s.bomba.toFixed(1), '| Exaust% =', s.exaustor.toFixed(1), '| JanLat% =', s.jan_lat.toFixed(1));
+console.log('T_pad   =', T_pad.toFixed(2), '°C (ar saindo do pad)');
+console.log('ACH total=', ach.toFixed(2));
+const P_total = P_solar + P_cond - P_vent - P_evap;
+const dT = (P_total * dt) / (massaAr * CP);
+console.log('P_total =', P_total.toFixed(0), 'W | dT =', dT.toFixed(4), '°C/tick');
+console.log('Para convergir precisa dT < 0. Atual:', dT < 0 ? 'OK (esfria)' : 'PROBLEMA (aquece)');
+
+// Diagnóstico no ponto de equilíbrio (TI=35)
+const eng_diag2 = new FuzzyEngine();
+// Primeiro tick para inicializar erroAnterior
+eng_diag2.computar(38, 35, 2, 25);
+const res_diag2 = eng_diag2.computar(35, 35, 2, 25);
+const s2 = res_diag2.saidas;
+console.log('=== DIAGNÓSTICO EQUILÍBRIO TI=35 TE=35 VV=2 SP=25 ===');
+console.log('Erro E =', 25 - 35, 'dErro =', res_diag2.saidas.dErro);
+console.log('Saídas:', JSON.stringify(s2));
+console.log('REF crisp =', res_diag2.refCrisp.toFixed(2), '| Aluminet% =', s2.aluminet.toFixed(1));
+// Balanço físico a TI=35
+const v2=672, D2=1.2, C2=1005, d2=30, m2=806.4;
+const alm2 = s2.aluminet/100*0.88;
+const rad2 = 800; // TE=35>=28
+const P_sol2 = rad2 * 112 * (1-alm2) * 0.06;
+const P_cond2 = 5.5 * 376 * (35-35); // zero
+const exf2 = Math.min(1, s2.exaustor/100);
+const janf2 = Math.min(1, s2.jan_lat/100);
+const januf2 = s2.jan_sup > 40 ? 1 : 0;
+const va2 = 1 + Math.min(3, 2/3.5);
+const ach2 = janf2*10*va2 + januf2*5*va2 + exf2*20;
+const P_vent2 = ach2 * v2/3600 * D2 * C2 * (35-35);
+const T_bwb2 = 35 - (1-0.55)*12;
+const T_pad2 = 35 - 0.88*(35-T_bwb2);
+const bomf2 = s2.bomba > 2 ? s2.bomba/100 : 0;
+const fluxe2 = exf2 * v2/3600 * D2 * 16.0;
+const P_evap2 = bomf2 * fluxe2 * C2 * Math.max(0, 35-T_pad2);
+const P_tot2 = P_sol2 + P_cond2 - P_vent2 - P_evap2;
+const dT2 = (P_tot2*d2)/(m2*C2);
+console.log(`TI=35: Solar=${P_sol2.toFixed(0)} Cond=${P_cond2.toFixed(0)} Vent=${P_vent2.toFixed(0)} Evap=${P_evap2.toFixed(0)}`);
+console.log(`P_total=${P_tot2.toFixed(0)} dT=${dT2.toFixed(4)} → ${dT2<0?'ESFRIA ✅':'AQUECE ❌'}`);
+console.log(`Aluminet=${s2.aluminet.toFixed(1)}% → bloqueio=${(alm2*100).toFixed(0)}% → T_pad=${T_pad2.toFixed(2)}°C`);
+
+// Rastreamento simples
+const eng_track = new FuzzyEngine();
+let TI_t = 38;
+let log_t = [];
+for(let t=0;t<=600;t++) {
+  const res = eng_track.computar(TI_t, 35, 2, 25);
+  const s = res.saidas;
+  const alm_f = s.aluminet/100*0.88;
+  const P_sol = 800*112*(1-alm_f)*0.06;
+  const P_cond = 5.5*376*(35-TI_t);
+  const exf = s.exaustor/100;
+  const janf = s.jan_lat/100;
+  const januf = s.jan_sup>40?1:0;
+  const va = 1+Math.min(3,2/3.5);
+  const ach = janf*10*va+januf*5*va+exf*20;
+  const P_vent = ach*672/3600*1.2*1005*(TI_t-35);
+  const T_pad = 35-0.88*(35-(35-0.45*12));
+  const bomf = s.bomba/100;
+  const fluxe = exf*672/3600*1.2*18;
+  const P_evap = bomf*fluxe*1005*Math.max(0,TI_t-T_pad);
+  const P_tot = P_sol+P_cond-P_vent-P_evap;
+  const dT = (P_tot*30)/(806.4*1005);
+  TI_t = Math.max(-5, Math.min(65, TI_t+dT));
+  if(t<=5 || t%30===0 || Math.abs(25-TI_t)<1)
+    log_t.push(`T${t}: TI=${TI_t.toFixed(2)} E=${(25-TI_t).toFixed(2)} REF=${s.refCrisp.toFixed(0)} dT=${dT.toFixed(3)}`);
+  if(Math.abs(25-TI_t)<0.5) { log_t.push(`✅ SP em T${t}!`); break; }
+}
+log_t.forEach(l => console.log(l));
+
+document.getElementById('output').innerHTML = html;
+
+// Resumo no console
+testes.forEach(t => {
+  const firstSPStr = t.firstSP !== null ? `${(t.firstSP/60).toFixed(1)}min` : 'NAO_ATINGIU';
+  const finalErro = Math.abs(t.SP - t.finalTI).toFixed(2);
+  const stabPct = (t.stabCount / t.maxTicks * 100).toFixed(1);
+  console.log(`RESULT | ${t.label} | firstSP=${firstSPStr} | TI_final=${t.finalTI.toFixed(2)} | SP=${t.SP} | erro=${finalErro} | stab=${stabPct}%`);
+});
+</script>
+</body>
+</html>
